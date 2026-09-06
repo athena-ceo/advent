@@ -353,8 +353,8 @@ class Game:
         ]
         self._labels = {n: getattr(self, "_l" + n) for n in names}
 
-    def _drive(self):
-        label = "2"
+    def _drive(self, start="2"):
+        label = start
         while label is not None:
             label = self._labels[label]()
 
@@ -375,6 +375,36 @@ class Game:
             self._drive()
         except (_GameOver, EOFError):
             pass
+
+    def resume(self, read_line, write=None):
+        """Continue a restored game: re-describe the room, then take commands.
+
+        Starts at label 2000 (describe location) rather than the top of the
+        turn loop, so the dwarves don't advance merely because the game was
+        reloaded -- that happens on the next actual move, as normal.
+        """
+        self._read_line = read_line
+        self._write = write
+        self.wzdark = False  # don't risk a spurious dark-pit death on reload
+        try:
+            self._drive(start="2000")
+        except (_GameOver, EOFError):
+            pass
+
+    # ---- save / restore ----------------------------------------------------
+
+    _NOSAVE = frozenset({"data", "rng", "_labels", "_read_line", "_write"})
+
+    def save_state(self) -> dict:
+        """A JSON-serialisable snapshot of the whole game (valid at a prompt)."""
+        attrs = {k: v for k, v in self.__dict__.items() if k not in self._NOSAVE}
+        return {"version": 1, "attrs": attrs, "rng": self.rng.get_state()}
+
+    def load_state(self, blob: dict) -> None:
+        """Restore a snapshot produced by :meth:`save_state`."""
+        for key, value in blob["attrs"].items():
+            setattr(self, key, value)
+        self.rng.set_state(blob["rng"])
 
     def play_commands(self, commands) -> str:
         """Feed a list of command strings; return the full transcript."""

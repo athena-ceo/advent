@@ -25,20 +25,25 @@ _DONE = object()        # engine thread has finished (game over / EOF)
 
 
 class Session:
-    def __init__(self, seed: int | None = None, session_id: str | None = None):
+    def __init__(self, seed: int | None = None, session_id: str | None = None,
+                 resume_state: dict | None = None):
         self.id = session_id or uuid.uuid4().hex[:12]
         self.seed = seed
         self.created_at = time.time()
         self.last_active = self.created_at
         self.ended = False
+        self._resume_state = resume_state
         self.game = Game(seed=seed)
+        if resume_state is not None:
+            self.game.load_state(resume_state)
         self._in: queue.Queue = queue.Queue()
         self._out: queue.Queue = queue.Queue()
         self._lock = threading.Lock()
         self._thread = threading.Thread(target=self._run, name=f"advent-{self.id}",
                                         daemon=True)
         self._thread.start()
-        # Collect the welcome banner and the first ("instructions?") prompt.
+        # For a fresh game this is the welcome banner + "instructions?" prompt;
+        # for a restored game it is the re-described current room.
         self.intro = self._pump(None)
 
     # -- engine thread ------------------------------------------------------
@@ -52,7 +57,10 @@ class Session:
 
     def _run(self) -> None:
         try:
-            self.game.run(self._read_line, self._out.put)
+            if self._resume_state is not None:
+                self.game.resume(self._read_line, self._out.put)
+            else:
+                self.game.run(self._read_line, self._out.put)
         finally:
             self._out.put(_DONE)
 
@@ -106,16 +114,41 @@ class SessionManager:
     def __init__(self, max_sessions: int = 200):
         self.max_sessions = max_sessions
         self._sessions: dict[str, Session] = {}
+        self._saves: dict[str, dict] = {}
         self._lock = threading.Lock()
+
+    def _register(self, session: Session) -> None:
+        self._sessions[session.id] = session
+        if len(self._sessions) > self.max_sessions:
+            oldest = min(self._sessions.values(), key=lambda s: s.last_active)
+            self._sessions.pop(oldest.id, None)
+            oldest.close()
 
     def create(self, seed: int | None = None) -> Session:
         session = Session(seed=seed)
         with self._lock:
-            self._sessions[session.id] = session
-            if len(self._sessions) > self.max_sessions:
-                oldest = min(self._sessions.values(), key=lambda s: s.last_active)
-                self._sessions.pop(oldest.id, None)
-                oldest.close()
+            self._register(session)
+        return session
+
+    def save(self, session_id: str) -> str | None:
+        """Snapshot a session's game; return a save id, or None if not found."""
+        session = self.get(session_id)
+        if session is None:
+            return None
+        save_id = uuid.uuid4().hex[:12]
+        with self._lock:
+            self._saves[save_id] = session.game.save_state()
+        return save_id
+
+    def restore(self, save_id: str) -> Session | None:
+        """Start a new session from a saved snapshot; None if the id is unknown."""
+        with self._lock:
+            blob = self._saves.get(save_id)
+        if blob is None:
+            return None
+        session = Session(resume_state=blob)
+        with self._lock:
+            self._register(session)
         return session
 
     def get(self, session_id: str) -> Session | None:

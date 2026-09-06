@@ -26,3 +26,13 @@ class Rng:
     def pct(self, n: int) -> bool:
         """True ``n`` percent of the time (``PCT(N) = RAN(100) < N``)."""
         return self.ran(100) < n
+
+    def get_state(self):
+        """Return the generator state as a JSON-serialisable value."""
+        version, internal, gauss = self._r.getstate()
+        return [version, list(internal), gauss]
+
+    def set_state(self, state) -> None:
+        """Restore generator state produced by :meth:`get_state`."""
+        version, internal, gauss = state
+        self._r.setstate((version, tuple(internal), gauss))

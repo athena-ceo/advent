@@ -44,7 +44,7 @@ The engine is exposed as an [MCP](https://modelcontextprotocol.io) server. Each
 game is a server-side session driven one command at a time; yes/no prompts
 (reincarnation, quit, hints) come back as ordinary output answered by the next
 call. Tools: `new_game`, `game_command`, `get_state`, `get_transcript`,
-`list_games`, `end_game`. `get_state` returns structured fields — location,
+`save_game`, `restore_game`, `list_games`, `end_game`. `get_state` returns fields — location,
 description, visible objects, inventory, exits, score, turns, closing/ended.
 
 **Claude Code (this repo):** copy [`.mcp.json.example`](.mcp.json.example) to

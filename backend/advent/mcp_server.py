@@ -103,6 +103,32 @@ def get_transcript(session_id: str) -> dict:
 
 
 @server.tool()
+def save_game(session_id: str) -> dict:
+    """Snapshot a game so it can be restored later. Returns {save_id}.
+
+    The game keeps playing; the snapshot is a point-in-time copy. Restore it
+    with restore_game(save_id), which starts a fresh session from the snapshot.
+    """
+    save_id = sessions.save(session_id)
+    if save_id is None:
+        return _not_found(session_id)
+    return {"save_id": save_id}
+
+
+@server.tool()
+def restore_game(save_id: str) -> dict:
+    """Start a new game from a saved snapshot. Returns {session_id, output, state}.
+
+    `output` is the re-described current room. Use the returned session_id for
+    subsequent game_command calls.
+    """
+    session = sessions.restore(save_id)
+    if session is None:
+        return {"error": f"no such save: {save_id!r}"}
+    return {"session_id": session.id, "output": session.intro, "state": session.state()}
+
+
+@server.tool()
 def list_games() -> dict:
     """List active game sessions with a brief status for each."""
     return {"sessions": [
