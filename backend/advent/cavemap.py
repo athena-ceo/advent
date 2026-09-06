@@ -62,7 +62,7 @@ def build_graph(data: GameData) -> tuple[dict[int, str], list[dict]]:
 
             if dest and dest != loc and dest in nodes:
                 if keyword == 1:
-                    via = "(forced)"
+                    via = "forced"
                 else:
                     words = data.motion_words(keyword)
                     via = words[0] if words else f"verb{keyword}"
@@ -108,8 +108,16 @@ def subgraph(nodes: dict[int, str], edges: list[dict], start: int,
     return sub_nodes, sub_edges
 
 
-def _mermaid_escape(text: str) -> str:
-    return text.replace('"', "'").replace("|", "/").replace("[", "(").replace("]", ")")
+def _node_text(text: str) -> str:
+    # Node labels are quoted; drop characters Mermaid mis-parses even quoted.
+    return text.replace('"', "'").replace("[", "(").replace("]", ")").replace("#", "no.")
+
+
+def _edge_text(vias: list[str]) -> str:
+    # Pipe-delimited edge labels are unquoted: keep only safe characters.
+    import re
+    label = re.sub(r"[^A-Za-z0-9 /_-]", "", "/".join(vias))
+    return label[:24]
 
 
 def to_mermaid(nodes: dict[int, str], edges: list[dict], direction: str = "LR",
@@ -117,10 +125,10 @@ def to_mermaid(nodes: dict[int, str], edges: list[dict], direction: str = "LR",
     """Render nodes/edges as a Mermaid ``graph`` definition."""
     lines = [f"graph {direction}"]
     for loc in sorted(nodes):
-        lines.append(f'  N{loc}["{_mermaid_escape(nodes[loc])}"]')
+        lines.append(f'  N{loc}["{_node_text(nodes[loc])}"]')
     for e in edges:
         arrow = "-.->" if e["conditional"] else "-->"
-        label = _mermaid_escape("/".join(e["via"]))[:24]
+        label = _edge_text(e["via"])
         lines.append(f'  N{e["from"]} {arrow}|{label}| N{e["to"]}')
     if highlight is not None and highlight in nodes:
         lines.append(f"  style N{highlight} fill:#ffd54f,stroke:#333,stroke-width:2px")
