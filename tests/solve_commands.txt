@@ -1,0 +1,272 @@
+# Canonical 350-point solve command list, one command per line.
+# Extracted from Brandon Rhodes' adventure walkthrough2 (a full solve
+# under the reference RNG). Used here as a deep-playthrough exercise.
+no
+brief
+enter
+get lamp
+xyzzy
+on
+get rod
+e
+get cage
+w
+w
+w
+drop rod
+get bird
+get rod
+w
+d
+d
+drop bird
+drop cage
+u
+w
+swing rod
+drop rod
+w
+get diamonds
+w
+s
+e
+s
+s
+s
+n
+e
+e
+nw
+get chest
+get diamonds
+se
+n
+get axe
+d
+w
+d
+throw axe
+get axe
+s
+get gold
+n
+throw axe
+get axe
+d
+w
+get coins
+e
+s
+get jewelry
+n
+drop axe
+sw
+w
+kill dragon
+yes
+get rug
+e
+e
+n
+n
+plugh
+drop gold
+drop diamonds
+drop jewelry
+drop coins
+drop chest
+drop rug
+plugh
+s
+s
+get axe
+n
+get silver
+n
+plover
+ne
+get platinum
+s
+plover
+plugh
+drop silver
+drop platinum
+get keys
+get food
+get bottle
+plugh
+s
+d
+w
+d
+w
+w
+oriental
+throw axe
+n
+w
+drop keys
+drop lantern
+drop food
+drop bottle
+e
+get emerald
+w
+get keys
+get lantern
+get food
+get bottle
+nw
+s
+se
+w
+w
+d
+pour water
+u
+w
+u
+n
+n
+get water
+s
+s
+d
+s
+d
+pour water
+u
+e
+d
+get oil
+u
+w
+d
+climb
+w
+get eggs
+n
+pour oil
+drop bottle
+n
+get trident
+w
+d
+sw
+u
+throw eggs
+cross
+ne
+e
+se
+s
+e
+feed bear
+unlock chain
+drop keys
+get chain
+get bear
+w
+w
+n
+ne
+e
+get spices
+w
+s
+w
+w
+sw
+drop bear
+sw
+sw
+d
+se
+se
+w
+w
+d
+climb
+w
+fee
+fie
+foe
+foo
+get eggs
+s
+d
+u
+w
+n
+e
+n
+unlock clam
+d
+d
+get pearl
+u
+u
+s
+u
+e
+u
+n
+plugh
+drop eggs
+drop trident
+drop emerald
+drop pearl
+drop spices
+drop chain
+plugh
+s
+d
+w
+d
+w
+w
+oriental
+get vase
+se
+e
+get pillow
+w
+ne
+e
+u
+e
+u
+n
+plugh
+drop pillow
+drop vase
+adventure._game.clock1
+plugh
+s
+s
+s
+n
+n
+n
+plugh
+s
+d
+w
+d
+e
+get magazine
+e
+drop magazine
+n
+n
+n
+n
+n
+n
+n
+sw
+get rod
+ne
+drop rod
+sw
+blast

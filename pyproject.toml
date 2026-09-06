@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "advent"
+version = "0.1.0"
+description = "Faithful Python port of the original 350-point Colossal Cave Adventure (Crowther & Woods)"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7", "adventure>=1.4"]
+
+[project.scripts]
+advent = "advent.cli:main"
+
+[tool.setuptools]
+packages = ["advent"]
+
+[tool.setuptools.package-data]
+advent = ["advent.dat"]

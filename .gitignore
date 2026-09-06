@@ -1,0 +1,7 @@
+# Copyright (c) 2026 Athena Decisions Systems SAS.
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+savefile
