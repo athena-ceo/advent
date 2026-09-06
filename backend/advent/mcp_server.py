@@ -17,6 +17,9 @@ import argparse
 
 from mcp.server.mcpserver import MCPServer
 
+from . import cavemap
+from .data import load_default_data
+from .scene import SceneStore
 from .session import SessionManager
 
 INSTRUCTIONS = """\
@@ -40,6 +43,10 @@ of location, inventory, score and whether the game has ended.
 
 server = MCPServer("adventure", instructions=INSTRUCTIONS)
 sessions = SessionManager()
+
+# Shared, read-only game data for map/scene tools (locations are static).
+GAME_DATA = load_default_data()
+scenes = SceneStore()  # cache dir from $ADVENT_SCENE_CACHE, placeholder art
 
 
 @server.custom_route("/health", methods=["GET"])
@@ -142,6 +149,66 @@ def list_games() -> dict:
 def end_game(session_id: str) -> dict:
     """Discard a game session and free its resources."""
     return {"closed": sessions.close(session_id)}
+
+
+@server.tool()
+def get_map(session_id: str | None = None, from_location: int | None = None,
+            depth: int | None = None, direction: str = "LR") -> dict:
+    """A God's-eye map of the cave, derived from the game's travel table.
+
+    Returns a Mermaid `graph` definition plus a structured {nodes, edges} graph.
+    Edges are labelled with the motion words that traverse them; conditional
+    motions (probabilistic or "must be carrying X") render as dashed links.
+
+    With `session_id` or `from_location` plus `depth`, returns just the subgraph
+    within `depth` hops of that room (and highlights it). Otherwise, the whole
+    cave (140 rooms) -- large but complete. `direction` is a Mermaid layout hint
+    (LR/TD/RL/BT).
+    """
+    nodes, edges = cavemap.cave_graph(GAME_DATA)
+    center = from_location
+    if session_id is not None:
+        session = sessions.get(session_id)
+        if session is None:
+            return _not_found(session_id)
+        center = session.game.loc
+
+    if center is not None and depth is not None:
+        nodes, edges = cavemap.subgraph(nodes, edges, center, depth)
+
+    mermaid = cavemap.to_mermaid(nodes, edges, direction=direction, highlight=center)
+    return {
+        "mermaid": mermaid,
+        "graph": {
+            "nodes": [{"id": loc, "name": name} for loc, name in sorted(nodes.items())],
+            "edges": edges,
+        },
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "center": center,
+    }
+
+
+@server.tool()
+def get_scene(session_id: str | None = None, location: int | None = None) -> dict:
+    """Get the illustration for a location (generated on first request, cached).
+
+    Pass `session_id` to illustrate that game's current room, or `location` for
+    a specific room number. Returns the image as a data URI (currently a
+    placeholder card; a real open-weights model can be plugged in), the exact
+    image prompt derived from the room, and whether it was served from cache.
+    """
+    loc = location
+    if session_id is not None:
+        session = sessions.get(session_id)
+        if session is None:
+            return _not_found(session_id)
+        loc = session.game.loc
+    if loc is None:
+        return {"error": "provide session_id or location"}
+    result = scenes.get(GAME_DATA, loc)
+    result["name"] = cavemap.cave_graph(GAME_DATA)[0].get(loc, f"Room {loc}")
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:

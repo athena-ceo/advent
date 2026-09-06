@@ -10,3 +10,6 @@ savefile
 # Node / frontend (added in the UI phase)
 node_modules/
 frontend/dist/
+
+# Generated scene images (lazy image cache)
+scene-cache/

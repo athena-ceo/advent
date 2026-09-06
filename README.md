@@ -44,8 +44,13 @@ The engine is exposed as an [MCP](https://modelcontextprotocol.io) server. Each
 game is a server-side session driven one command at a time; yes/no prompts
 (reincarnation, quit, hints) come back as ordinary output answered by the next
 call. Tools: `new_game`, `game_command`, `get_state`, `get_transcript`,
-`save_game`, `restore_game`, `list_games`, `end_game`. `get_state` returns fields — location,
-description, visible objects, inventory, exits, score, turns, closing/ended.
+`save_game`, `restore_game`, `get_map`, `get_scene`, `list_games`, `end_game`.
+`get_state` returns fields — location, description, visible objects, inventory,
+exits, score, turns, closing/ended. `get_map` returns a Mermaid graph of the
+cave derived from the travel table (full or a subgraph around a room);
+`get_scene` returns the current location's illustration (generated on first
+request and cached — a placeholder card today, an open-weights image model
+later) plus the exact per-room image prompt.
 
 **Claude Code (this repo):** copy [`.mcp.json.example`](.mcp.json.example) to
 `.mcp.json`, set the `command` to your venv's Python, and start a new Claude Code
