@@ -1,0 +1,2 @@
+# Runtime dependencies for the Adventure MCP backend.
+mcp>=2,<3

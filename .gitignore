@@ -5,3 +5,8 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 savefile
+# Machine-specific MCP config (see .mcp.json.example)
+.mcp.json
+# Node / frontend (added in the UI phase)
+node_modules/
+frontend/dist/

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "adventure": {
+      "type": "stdio",
+      "command": "/ABSOLUTE/PATH/TO/advent/.venv/bin/python",
+      "args": ["-m", "advent.mcp_server"]
+    }
+  }
+}

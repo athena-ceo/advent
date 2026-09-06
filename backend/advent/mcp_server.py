@@ -42,6 +42,15 @@ server = MCPServer("adventure", instructions=INSTRUCTIONS)
 sessions = SessionManager()
 
 
+@server.custom_route("/health", methods=["GET"])
+async def health(request):
+    """Liveness probe (served in HTTP mode) used by the deploy smoke test."""
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({"status": "ok", "server": "adventure",
+                         "sessions": len(sessions.list())})
+
+
 def _not_found(session_id: str) -> dict:
     return {"error": f"no such session: {session_id!r}. Call new_game first."}
 

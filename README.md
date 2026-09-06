@@ -3,86 +3,104 @@
 # Adventure
 
 A faithful Python port of the original **350-point Colossal Cave Adventure**
-(Crowther & Woods), driven directly by the historic `advent.dat` database and
-translated label-for-label from the PDP-10 FORTRAN source `advent.for` (both in
-the repository root).
+(Crowther & Woods), plus an MCP server that exposes the game as tools so an LLM
+chat UI can play it and reason over its state. Driven directly by the historic
+`advent.dat` database and translated label-for-label from the FORTRAN source.
 
-This is Phase 0 + 1 of the port: a clean, self-contained engine with a terminal
-front end and a fidelity test suite. The web UI, AI-generated location art, and
-the MCP tool server come in later phases — the engine is built to support them
-(command-at-a-time play, fully serialisable state).
+## Repository layout
 
-## Layout
-
-| Path | What it is |
-|---|---|
-| [`advent/data.py`](advent/data.py) | Parser: `advent.dat` → a structured `GameData` |
-| [`advent/game.py`](advent/game.py) | The engine — a faithful port of `advent.for` |
-| [`advent/rng.py`](advent/rng.py) | Seedable random source (`ran`/`pct`) |
-| [`advent/cli.py`](advent/cli.py) | Terminal front end |
-| [`advent/session.py`](advent/session.py) | Command-at-a-time sessions over the engine |
-| [`advent/mcp_server.py`](advent/mcp_server.py) | MCP server exposing the game as tools |
-| [`tests/`](tests/) | Parser, engine, and session/MCP tests |
-
-## Play
-
-```bash
-python -m advent            # random game
-python -m advent --seed 12  # reproducible game
+```
+fortran/        Original PDP-10 source (advent.for, advent.dat, advent.mic, advent.readme)
+backend/        Python app
+  advent/       The engine + MCP server package
+  tests/        Parser, engine, and session/MCP tests
+  Dockerfile    Backend container (MCP server over HTTP)
+  pyproject.toml
+frontend/       React UI (imaging + chat) — added in the UI phase
+nginx/          Path-based location block for apps.athenadecisions.com
+scripts/        smoke_test.py (health + MCP round-trip)
+docker-compose.{dev,server}.yml
+advent.sh       Control script (start/stop/logs/health/smoke/test/deploy)
+.github/workflows/ci.yml
 ```
 
-## MCP server
+The historic FORTRAN in [`fortran/`](fortran/) is the reference the port was
+built from; the engine runs entirely on the Python in `backend/`.
 
-The engine is exposed as an [MCP](https://modelcontextprotocol.io) server so an
-LLM chat UI can play the game through tool calls and reason over its state and
-history. Each game is a server-side session driven one command at a time; yes/no
-prompts (reincarnation, quit, hints) come back as ordinary output to be answered
-by the next call.
+## Quick start (local)
 
 ```bash
-pip install -e ".[mcp]"
-python -m advent.mcp_server                    # stdio (local MCP clients)
-python -m advent.mcp_server --http --port 8040 # streamable HTTP (hosting)
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -e "./backend[test]"     # engine + MCP server + test/oracle deps
+
+python -m advent                     # play in the terminal
+python -m advent.mcp_server          # run the MCP server (stdio)
+python -m pytest backend/tests -q    # run the tests
 ```
 
-Tools: `new_game`, `game_command`, `get_state`, `get_transcript`, `list_games`,
-`end_game`. `get_state` returns structured fields — location, description,
-visible objects, inventory, exits, score, turns, and the closing/ended flags.
+## Play through an LLM (MCP)
+
+The engine is exposed as an [MCP](https://modelcontextprotocol.io) server. Each
+game is a server-side session driven one command at a time; yes/no prompts
+(reincarnation, quit, hints) come back as ordinary output answered by the next
+call. Tools: `new_game`, `game_command`, `get_state`, `get_transcript`,
+`list_games`, `end_game`. `get_state` returns structured fields — location,
+description, visible objects, inventory, exits, score, turns, closing/ended.
+
+**Claude Code (this repo):** copy [`.mcp.json.example`](.mcp.json.example) to
+`.mcp.json`, set the `command` to your venv's Python, and start a new Claude Code
+session — it will prompt to approve the `adventure` server, after which you can
+say "start a game of Adventure and play it with me".
+
+**Claude Desktop (macOS):** edit
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "adventure": {
+      "command": "/ABSOLUTE/PATH/TO/advent/.venv/bin/python",
+      "args": ["-m", "advent.mcp_server"]
+    }
+  }
+}
+```
+
+(Windows: `%APPDATA%\Claude\claude_desktop_config.json`.) Restart Claude Desktop.
+
+## Docker & deploy (apps.athenadecisions.com)
+
+Served path-based at `/advent` (backend container 8040 — distinct from
+golden-path 8020 and xcape 8030; the React frontend will take 3040).
+
+```bash
+./advent.sh start dev      # build + run the backend locally
+./advent.sh health dev     # curl the health probe
+./advent.sh smoke dev      # health + MCP round-trip against the running server
+./advent.sh deploy prod    # git pull, build, up, health check (on the server)
+```
+
+One-time on the server: paste the blocks from
+[`nginx/advent-apps-location.conf`](nginx/advent-apps-location.conf) into the
+`apps.athenadecisions.com` server block, then `sudo nginx -t && sudo systemctl
+reload nginx`. The MCP endpoint is then at
+`https://apps.athenadecisions.com/advent/mcp`.
+
+## CI
+
+Every push/PR runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+backend pytest, plus a Docker smoke test that builds the image, boots the
+container, and drives a short game through the MCP endpoint.
 
 ## Design notes
 
 - **The data file is the game.** `advent.dat` holds every room, object, message,
-  the travel map, vocabulary, hints and scoring. The parser preserves the
-  original encodings (notably the flat `travel` array and its `key` index) so the
-  engine can mirror the FORTRAN exactly.
-- **Control flow is preserved.** The FORTRAN is one routine wired with `GOTO`s.
-  Each numbered label becomes a small method (`_l2000` == FORTRAN label 2000)
-  returning the next label; a dispatch loop runs them. Statement numbers appear
-  in comments so the two can be read side by side.
-- **State is plain, serialisable attributes** — ready for save/restore, a web
-  backend, or an MCP server to inspect and drive a command at a time.
-- **Lightly modernised**: the FORTRAN's mixed-case interface strings are kept as
-  written; the all-caps styling of the classic game is left to the UI layer. The
-  "cave hours"/wizard gating (a 1977 timesharing artefact) is dropped.
-
-## Testing & fidelity
-
-```bash
-pip install -e ".[test]"    # installs pytest + the reference `adventure` package
-python -m pytest -q
-```
-
-Brandon Rhodes' independently-written [`adventure`](https://pypi.org/project/adventure/)
-package (a faithful port of the *same* `advent.dat`/`advent.for`) is used only as
-a **test oracle**, never as a runtime dependency:
-
-- **Parser** — every room description, object message, arbitrary message and
-  object placement is cross-checked against the reference (`test_parser.py`).
-- **Engine** — a broad deterministic script is diffed **line-for-line** against
-  the reference and matches exactly (`test_deterministic_matches_reference`).
-  The comparison stays in the pre-Hall-of-Mists region because past that point
-  both engines' random dwarf/pirate subsystems fire, and the two use different
-  RNG implementations, so their random *timing* legitimately diverges.
-- A full 269-command canonical solve runs end to end through the engine,
-  exercising the deep mechanics (mazes, troll bridge, dragon, treasures,
-  cave-closing endgame, scoring).
+  the travel map, vocabulary, hints and scoring; the parser preserves the
+  original encodings so the engine mirrors the FORTRAN.
+- **Control flow is preserved.** Each FORTRAN `GOTO` label is a small method
+  (`_l2000` == label 2000) run by a dispatch loop.
+- **State is plain, serialisable attributes**, played a command at a time —
+  ready for save/restore, the web backend, and the MCP tools.
+- Brandon Rhodes' [`adventure`](https://pypi.org/project/adventure/) package is
+  used only as a **test oracle** (parser cross-check + line-for-line engine diff
+  on deterministic play), never at runtime.

@@ -1,0 +1,28 @@
+# Copyright (c) 2026 Athena Decisions Systems SAS.
+#
+# Production stack for apps.athenadecisions.com.
+# Ports: backend 8040 (distinct from golden-path 8020, xcape 8030).
+# The React frontend (port 3040) is added in the imaging/UI phase.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8040}:8000"
+    environment:
+      ENVIRONMENT: production
+    networks:
+      - advent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  advent-network:
+    driver: bridge

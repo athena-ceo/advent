@@ -1,0 +1,23 @@
+# Copyright (c) 2026 Athena Decisions Systems SAS.
+#
+# Local development stack. Source is mounted so code edits take effect on a
+# container restart (the MCP server imports `advent` from the working dir).
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8040}:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      ENVIRONMENT: development
+    command: ["python", "-m", "advent.mcp_server", "--http", "--host", "0.0.0.0", "--port", "8000"]
+    networks:
+      - advent-network
+
+networks:
+  advent-network:
+    driver: bridge
