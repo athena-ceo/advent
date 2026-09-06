@@ -10,10 +10,12 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=7", "adventure>=1.4"]
+mcp = ["mcp>=2"]
+test = ["pytest>=7", "adventure>=1.4", "mcp>=2"]
 
 [project.scripts]
 advent = "advent.cli:main"
+advent-mcp = "advent.mcp_server:main"
 
 [tool.setuptools]
 packages = ["advent"]

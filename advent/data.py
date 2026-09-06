@@ -93,6 +93,34 @@ class GameData:
             raise KeyError(f"required vocabulary word not found: {word!r}")
         return -1
 
+    def _reverse_vocab(self):
+        cache = self.__dict__.get("_rev")
+        if cache is None:
+            obj_words: dict[int, str] = {}
+            motion_words: dict[int, list[str]] = {}
+            for num, word in zip(self.vocab_num, self.vocab_word):
+                kind, n = num // 1000, num % 1000
+                if kind == 1:
+                    obj_words.setdefault(n, word)
+                elif kind == 0:
+                    motion_words.setdefault(n, []).append(word)
+            cache = self.__dict__["_rev"] = (obj_words, motion_words)
+        return cache
+
+    def object_word(self, obj: int) -> str | None:
+        """First vocabulary keyword naming object ``obj`` (lower-cased)."""
+        word = self._reverse_vocab()[0].get(obj)
+        return word.lower() if word else None
+
+    def object_name(self, obj: int) -> str:
+        """Human-readable name for an object (its inventory message)."""
+        name = self.inventory.get(obj) or self.object_word(obj) or f"object {obj}"
+        return name.lstrip("*")
+
+    def motion_words(self, verb: int) -> list[str]:
+        """Vocabulary keywords for motion ``verb`` (lower-cased)."""
+        return [w.lower() for w in self._reverse_vocab()[1].get(verb, [])]
+
 
 def _split_message_line(line: str) -> tuple[int, str]:
     """Split a message record ``NUMBER<TAB>TEXT`` on its first tab only."""

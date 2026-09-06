@@ -20,7 +20,9 @@ the MCP tool server come in later phases — the engine is built to support them
 | [`advent/game.py`](advent/game.py) | The engine — a faithful port of `advent.for` |
 | [`advent/rng.py`](advent/rng.py) | Seedable random source (`ran`/`pct`) |
 | [`advent/cli.py`](advent/cli.py) | Terminal front end |
-| [`tests/`](tests/) | Parser + engine fidelity tests |
+| [`advent/session.py`](advent/session.py) | Command-at-a-time sessions over the engine |
+| [`advent/mcp_server.py`](advent/mcp_server.py) | MCP server exposing the game as tools |
+| [`tests/`](tests/) | Parser, engine, and session/MCP tests |
 
 ## Play
 
@@ -28,6 +30,24 @@ the MCP tool server come in later phases — the engine is built to support them
 python -m advent            # random game
 python -m advent --seed 12  # reproducible game
 ```
+
+## MCP server
+
+The engine is exposed as an [MCP](https://modelcontextprotocol.io) server so an
+LLM chat UI can play the game through tool calls and reason over its state and
+history. Each game is a server-side session driven one command at a time; yes/no
+prompts (reincarnation, quit, hints) come back as ordinary output to be answered
+by the next call.
+
+```bash
+pip install -e ".[mcp]"
+python -m advent.mcp_server                    # stdio (local MCP clients)
+python -m advent.mcp_server --http --port 8040 # streamable HTTP (hosting)
+```
+
+Tools: `new_game`, `game_command`, `get_state`, `get_transcript`, `list_games`,
+`end_game`. `get_state` returns structured fields — location, description,
+visible objects, inventory, exits, score, turns, and the closing/ended flags.
 
 ## Design notes
 

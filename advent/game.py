@@ -1868,7 +1868,12 @@ class Game:
 
     # ---- scoring / exit ----------------------------------------------------
 
-    def _l20000(self):
+    def compute_score(self):
+        """Return ``(score, max_score)`` for the current state (no side effects).
+
+        Mirrors the tally in FORTRAN label 20000; used both by the exit/score
+        path and to report a live score in structured state.
+        """
         score = 0
         mxscor = 0
         for i in range(50, self.MAXTRS + 1):
@@ -1913,6 +1918,80 @@ class Game:
         for i in range(1, self.data.hntmax + 1):
             if self.hinted[i]:
                 score -= self.data.hints[i][1]
+        return score, mxscor
+
+    # ---- structured state (for web / MCP consumers) -----------------------
+
+    def visible_objects(self):
+        """Object numbers visible at the current location (none if dark)."""
+        if self._dark():
+            return []
+        seen, result = set(), []
+        i = self.atloc[self.loc]
+        while i != 0:
+            obj = i if i <= 100 else i - 100
+            if obj not in seen:
+                seen.add(obj)
+                result.append(obj)
+            i = self.link[i]
+        return result
+
+    def inventory_objects(self):
+        """Object numbers currently being carried."""
+        return [o for o in range(1, 101) if self.place[o] == -1]
+
+    def available_motions(self):
+        """Motion keywords with an exit from the current location.
+
+        Includes hidden/secret passages -- it reads the raw travel table -- so
+        treat it as a map aid, not something the original game would volunteer.
+        """
+        key = self.data.key.get(self.loc, 0)
+        if not key:
+            return []
+        verbs, kk = [], key
+        while True:
+            entry = self.data.travel[kk]
+            v = abs(entry) % 1000
+            if v != 1 and v not in verbs:
+                verbs.append(v)
+            if entry < 0:
+                break
+            kk += 1
+        words = []
+        for v in verbs:
+            w = self.data.motion_words(v)
+            if w:
+                words.append(w[0])
+        return words
+
+    def state(self) -> dict:
+        """A JSON-serialisable snapshot of the game for external consumers."""
+        loc = self.loc
+        score, mxscor = self.compute_score()
+        long = self.data.long_desc.get(loc, "")
+        short = self.data.short_desc.get(loc)
+        name = (short or long or "").split("\n", 1)[0]
+        return {
+            "location": loc,
+            "name": name,
+            "description": long,
+            "dark": self._dark(),
+            "visible_objects": [self.data.object_name(o) for o in self.visible_objects()],
+            "inventory": [self.data.object_name(o) for o in self.inventory_objects()],
+            "exits": self.available_motions(),
+            "score": score,
+            "max_score": mxscor,
+            "turns": self.turns,
+            "carrying": self.holdng,
+            "lamp_on": self.prop[self.LAMP] == 1,
+            "closing": self.closng,
+            "closed": self.closed,
+            "ended": False,
+        }
+
+    def _l20000(self):
+        score, mxscor = self.compute_score()
         self.score = score
         self.mxscor = mxscor
         if self.scorng:
