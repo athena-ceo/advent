@@ -138,3 +138,21 @@ def cave_graph(data: GameData | None = None) -> tuple[dict[int, str], list[dict]
         nodes, edges = build_graph(data)
         _cache = (data, nodes, edges)
     return _cache[1], _cache[2]
+
+
+def map_payload(data: GameData, center: int | None = None, depth: int | None = None,
+                direction: str = "LR") -> dict:
+    """A ready-to-serve map: Mermaid + structured graph, full or a subgraph."""
+    nodes, edges = cave_graph(data)
+    if center is not None and depth is not None:
+        nodes, edges = subgraph(nodes, edges, center, depth)
+    return {
+        "mermaid": to_mermaid(nodes, edges, direction=direction, highlight=center),
+        "graph": {
+            "nodes": [{"id": n, "name": name} for n, name in sorted(nodes.items())],
+            "edges": edges,
+        },
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "center": center,
+    }

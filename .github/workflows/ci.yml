@@ -38,9 +38,7 @@ jobs:
             sleep 2
           done
       - name: Smoke test
-        run: |
-          pip install "mcp>=2,<3"
-          SMOKE_BASE_URL=http://localhost:8040 python scripts/smoke_test.py
+        run: SMOKE_BASE_URL=http://localhost:8040 python scripts/smoke_test.py
       - name: Container logs on failure
         if: failure()
         run: docker logs advent || true

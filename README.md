@@ -34,9 +34,16 @@ python3.12 -m venv .venv && . .venv/bin/activate
 pip install -e "./backend[test]"     # engine + MCP server + test/oracle deps
 
 python -m advent                     # play in the terminal
-python -m advent.mcp_server          # run the MCP server (stdio)
+python -m advent.web                 # run the web backend (REST API on :8040)
+python -m advent.mcp_server          # run the MCP server (stdio, for LLM clients)
 python -m pytest backend/tests -q    # run the tests
 ```
+
+The web backend serves the React app: direct-play REST endpoints under `/api`
+(`POST /api/games`, `POST /api/games/{id}/command`, `.../state`, `.../scene`,
+`.../map`, `.../save`, `POST /api/restore`) plus a Claude-driven natural-language
+mode at `POST /api/games/{id}/chat`. Chat mode needs `ANTHROPIC_API_KEY` set on
+the server (it returns 503 otherwise); direct play needs no key.
 
 ## Play through an LLM (MCP)
 

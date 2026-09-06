@@ -17,4 +17,4 @@ COPY . .
 RUN pip install --no-cache-dir .
 
 EXPOSE 8000
-CMD ["python", "-m", "advent.mcp_server", "--http", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "advent.web:app", "--host", "0.0.0.0", "--port", "8000"]
