@@ -12,7 +12,7 @@ from __future__ import annotations
 from io import BytesIO
 
 from .data import GameData
-from .scene import scene_prompt
+from .scene import STYLE_GUIDE, scene_prompt, scene_subject_text
 
 # Sensible steps/guidance/size per model. Turbo/schnell are few-step, low-CFG.
 MODEL_DEFAULTS: dict[str, dict] = {
@@ -23,7 +23,8 @@ MODEL_DEFAULTS: dict[str, dict] = {
     "runwayml/stable-diffusion-v1-5": {"steps": 28, "guidance": 7.5, "size": 512},
 }
 
-NEGATIVE = "text, words, letters, watermark, signature, ui, frame, blurry, low quality"
+NEGATIVE = ("people, person, human, figure, crowd, text, words, letters, "
+            "watermark, signature, ui, frame, blurry, low quality")
 
 
 def pick_device() -> str:
@@ -64,12 +65,25 @@ class DiffusersGenerator:
 
     def __call__(self, data: GameData, loc: int) -> tuple[bytes, str]:
         self._ensure_pipe()
-        prompt = scene_prompt(data, loc)
-        kwargs = {"prompt": prompt, "num_inference_steps": self.steps,
-                  "guidance_scale": self.guidance, "height": self.size, "width": self.size}
-        # Turbo/schnell pipelines reject a negative prompt at guidance 0.
-        if self.guidance and self.guidance > 0:
-            kwargs["negative_prompt"] = NEGATIVE
+        kwargs = {"num_inference_steps": self.steps, "guidance_scale": self.guidance,
+                  "height": self.size, "width": self.size}
+        use_negative = bool(self.guidance and self.guidance > 0)
+
+        if "xl" in self.model.lower():
+            # SDXL has two CLIP encoders (77 tokens each): scene -> encoder 1,
+            # style -> encoder 2, so both apply in full without truncation.
+            kwargs["prompt"] = scene_subject_text(data, loc)
+            kwargs["prompt_2"] = STYLE_GUIDE
+            if use_negative:
+                kwargs["negative_prompt"] = NEGATIVE
+                kwargs["negative_prompt_2"] = NEGATIVE
+        else:
+            # T5-based models (FLUX, SD3, PixArt) take the full combined prompt;
+            # single-CLIP models truncate it (not recommended for long scenes).
+            kwargs["prompt"] = scene_prompt(data, loc)
+            if use_negative:
+                kwargs["negative_prompt"] = NEGATIVE
+
         image = self._pipe(**kwargs).images[0]
         buf = BytesIO()
         image.save(buf, format="PNG")

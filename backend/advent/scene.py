@@ -19,17 +19,16 @@ from pathlib import Path
 
 from .data import GameData
 
-# Photorealistic high fantasy -- Myst, but more fantastical. Kept concise and
-# placed first so the look stays consistent across all ~140 rooms even when a
-# long room description would otherwise crowd out the style under CLIP's token
-# limit.
+# Photorealistic high fantasy -- Myst, but more fantastical. On SDXL this is sent
+# to the *second* text encoder (its own 77-token budget), so it applies in full
+# to every room without crowding out the scene; on other models it is appended
+# to the scene. Keep it under ~77 tokens.
 STYLE_GUIDE = (
-    "Photorealistic high-fantasy environment, in the spirit of the game Myst but "
-    "more fantastical. A still, mysterious, uninhabited scene captured as a "
-    "cinematic wide establishing shot: ancient hand-built stonework meeting an "
-    "otherworldly natural landscape, volumetric light, drifting mist, dust motes, "
-    "weathered organic textures, physically based rendering, ray-traced global "
-    "illumination, hyper-detailed, sharp focus, 8k. No people, no text, no words."
+    "photorealistic high fantasy in the spirit of Myst but more fantastical, "
+    "a still uninhabited cinematic establishing shot, ancient hand-built "
+    "stonework meeting an otherworldly landscape, volumetric light, drifting "
+    "mist, weathered textures, physically based rendering, ray-traced global "
+    "illumination, hyper-detailed, 8k, deserted and empty, no signage"
 )
 
 # Second-person openings the game uses, stripped so the prompt reads as a scene.
@@ -49,15 +48,25 @@ def _scene_subject(text: str) -> str:
     """Turn a room's second-person description into a neutral scene phrase."""
     s = " ".join(text.split()).lower()
     s = _LEAD.sub("", s)          # "you are standing at the end of..." -> "end of..."
-    return s[:240].strip()
+    if len(s) > 300:              # keep even a CLIP encoder's scene budget sane
+        cut = s.rfind(".", 0, 300)
+        s = s[: cut + 1] if cut > 80 else s[:300]
+    return s.strip()
 
 
-def scene_prompt(data: GameData, loc: int) -> str:
-    """The image-model prompt for a location: the shared style then the scene."""
+def scene_subject_text(data: GameData, loc: int) -> str:
+    """Just the scene (no style), cleaned from the room's description."""
     text = data.long_desc.get(loc, "")
     if not text or text.startswith(">$<"):
         text = data.short_desc.get(loc) or "a mysterious chamber deep in a colossal cave"
-    return f"{STYLE_GUIDE} Scene: {_scene_subject(text)}"
+    return _scene_subject(text)
+
+
+def scene_prompt(data: GameData, loc: int) -> str:
+    """The combined prompt (scene then style) for display and single-encoder /
+    T5 models. On SDXL the generator instead sends the scene and style to the
+    two separate encoders (see ``imagegen``)."""
+    return f"{scene_subject_text(data, loc)} — {STYLE_GUIDE}"
 
 
 def _wrap(text: str, width: int) -> list[str]:
