@@ -26,7 +26,7 @@ def test_direct_play_flow(client):
     for cmd in ["no", "enter", "take lamp"]:
         r = client.post(f"/api/games/{sid}/command", json={"command": cmd}).json()
     assert r["state"]["location"] == 3
-    assert "BRASS LANTERN" in r["state"]["inventory"]
+    assert "BRASS LANTERN" in [o["name"] for o in r["state"]["inventory"]]
 
     assert client.get(f"/api/games/{sid}/state").json()["location"] == 3
     assert client.get(f"/api/games/{sid}/transcript").json()["transcript"]
@@ -45,7 +45,7 @@ def test_save_and_restore(client):
     save_id = client.post(f"/api/games/{sid}/save").json()["save_id"]
     r = client.post("/api/restore", json={"save_id": save_id}).json()
     assert r["state"]["location"] == 3
-    assert "BRASS LANTERN" in r["state"]["inventory"]
+    assert "BRASS LANTERN" in [o["name"] for o in r["state"]["inventory"]]
 
 
 def test_unknown_session_is_404(client):

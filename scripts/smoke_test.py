@@ -40,9 +40,10 @@ def main() -> int:
     for cmd in ["no", "enter", "take lamp"]:
         state = _post(f"/api/games/{sid}/command", {"command": cmd})["state"]
     assert state["location"] == 3, f"expected building (3), got {state['location']}"
-    assert "BRASS LANTERN" in state["inventory"], state["inventory"]
+    inv_names = [o["name"] for o in state["inventory"]]
+    assert "BRASS LANTERN" in inv_names, inv_names
     print(f"[smoke] played 3 turns: loc={state['location']} "
-          f"inventory={state['inventory']} score={state['score']}")
+          f"inventory={inv_names} score={state['score']}")
 
     m = _get(f"/api/games/{sid}/map?depth=1")
     assert m["center"] == 3 and m["node_count"] >= 2

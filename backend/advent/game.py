@@ -1995,6 +1995,10 @@ class Game:
                 words.append(w[0])
         return words
 
+    def _obj_ref(self, obj: int) -> dict:
+        """Display name plus the command word for an object (word may be None)."""
+        return {"name": self.data.object_name(obj), "word": self.data.object_word(obj)}
+
     def state(self) -> dict:
         """A JSON-serialisable snapshot of the game for external consumers."""
         loc = self.loc
@@ -2007,8 +2011,8 @@ class Game:
             "name": name,
             "description": long,
             "dark": self._dark(),
-            "visible_objects": [self.data.object_name(o) for o in self.visible_objects()],
-            "inventory": [self.data.object_name(o) for o in self.inventory_objects()],
+            "visible_objects": [self._obj_ref(o) for o in self.visible_objects()],
+            "inventory": [self._obj_ref(o) for o in self.inventory_objects()],
             "exits": self.available_motions(),
             "score": score,
             "max_score": mxscor,

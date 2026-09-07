@@ -1,12 +1,14 @@
 // Copyright (c) 2026 Athena Decisions Systems SAS.
+export interface ObjRef { name: string; word: string | null; }
+
 export interface GameState {
   session_id?: string;
   location: number;
   name: string;
   description: string;
   dark: boolean;
-  visible_objects: string[];
-  inventory: string[];
+  visible_objects: ObjRef[];
+  inventory: ObjRef[];
   exits: string[];
   score: number;
   max_score: number;

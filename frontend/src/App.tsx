@@ -20,6 +20,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [saveId, setSaveId] = useState<string | null>(null);
   const [sceneLoading, setSceneLoading] = useState(false);
+  const [mapDepth, setMapDepth] = useState<number | undefined>(1);
   const started = useRef(false);
 
   const push = (line: Line) => setLines((ls) => [...ls, line]);
@@ -27,13 +28,19 @@ export default function App() {
   const refreshPanels = useCallback(async (id: string) => {
     setSceneLoading(true);
     try {
-      const [sc, mp] = await Promise.all([api.scene(id), api.map(id, 2)]);
+      const [sc, mp] = await Promise.all([api.scene(id), api.map(id, mapDepth)]);
       setScene(sc);
       setMapCode(mp.mermaid);
     } catch { /* panels are best-effort */ } finally {
       setSceneLoading(false);
     }
-  }, []);
+  }, [mapDepth]);
+
+  // Refetch just the map when the depth control changes.
+  useEffect(() => {
+    if (!sid) return;
+    api.map(sid, mapDepth).then((m) => setMapCode(m.mermaid)).catch(() => {});
+  }, [mapDepth, sid]);
 
   const newGame = useCallback(async () => {
     setBusy(true);
@@ -142,10 +149,10 @@ export default function App() {
 
         <aside className="flex flex-col gap-4 overflow-y-auto scroll-thin min-h-0">
           <ScenePanel scene={scene} loading={sceneLoading} />
-          <StatusBar state={state} />
+          <StatusBar state={state} onAction={send} />
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-cave-600 mb-1 px-1">Nearby map</div>
-            <MapPanel code={mapCode} />
+            <div className="text-[10px] uppercase tracking-wider text-cave-600 mb-1 px-1">Cave map</div>
+            <MapPanel code={mapCode} depth={mapDepth} onDepth={setMapDepth} />
           </div>
         </aside>
       </main>

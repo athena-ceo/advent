@@ -20,7 +20,7 @@ def test_session_command_flow():
     assert r["state"]["name"]
 
     r = s.command("take lamp")
-    assert "BRASS LANTERN" in r["state"]["inventory"]
+    assert "BRASS LANTERN" in [o["name"] for o in r["state"]["inventory"]]
 
     # A yes/no prompt comes back as ordinary output, answered by the next call.
     r = s.command("quit")
