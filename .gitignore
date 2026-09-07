@@ -19,3 +19,5 @@ scene-cache/
 scene-cache/
 .venv-img/
 .venv*/
+*~
+.env~
