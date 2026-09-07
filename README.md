@@ -91,9 +91,11 @@ cp .env.example .env          # then put your ANTHROPIC_API_KEY in it
 ./advent.sh start dev         # docker compose up --build
 ```
 
-Open **http://localhost:3040**. Classic mode needs no key; Guided (LLM) mode
-uses the `ANTHROPIC_API_KEY` from `.env`. Other commands: `./advent.sh logs dev`,
-`./advent.sh ps dev`, `./advent.sh smoke dev`, `./advent.sh stop dev`.
+`start` prints the URLs (frontend, backend Swagger docs at `/docs`, health);
+`./advent.sh urls dev` reprints them. Classic mode needs no key; Guided (LLM)
+mode uses the `ANTHROPIC_API_KEY` from `.env`. Other commands:
+`./advent.sh logs dev`, `./advent.sh ps dev`, `./advent.sh smoke dev`,
+`./advent.sh stop dev`.
 
 ## Deploy (apps.athenadecisions.com)
 
