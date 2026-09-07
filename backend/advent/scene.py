@@ -14,26 +14,50 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
+import re
 from pathlib import Path
 
 from .data import GameData
 
+# Photorealistic high fantasy -- Myst, but more fantastical. Kept concise and
+# placed first so the look stays consistent across all ~140 rooms even when a
+# long room description would otherwise crowd out the style under CLIP's token
+# limit.
 STYLE_GUIDE = (
-    "Retro fantasy illustration for a cave-exploration adventure game, "
-    "painterly, atmospheric, moody lighting, muted earthy palette, "
-    "1970s pulp adventure book cover art, no text, no words, no letters."
+    "Photorealistic high-fantasy environment, in the spirit of the game Myst but "
+    "more fantastical. A still, mysterious, uninhabited scene captured as a "
+    "cinematic wide establishing shot: ancient hand-built stonework meeting an "
+    "otherworldly natural landscape, volumetric light, drifting mist, dust motes, "
+    "weathered organic textures, physically based rendering, ray-traced global "
+    "illumination, hyper-detailed, sharp focus, 8k. No people, no text, no words."
+)
+
+# Second-person openings the game uses, stripped so the prompt reads as a scene.
+# Each token requires a trailing space so e.g. "in" won't eat the "in" of "inside".
+_LEAD = re.compile(
+    r"^you(?:'re| are)\s+(?:now\s+|really\s+)?"
+    r"(?:(?:standing|sitting|walking|crawling|lying)\s+)?"
+    r"(?:(?:at|in|on|inside|atop|near|by|beside)\s+)?"
+    r"(?:the\s+)?",
+    re.IGNORECASE,
 )
 
 _EXT = {"image/svg+xml": "svg", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 
 
+def _scene_subject(text: str) -> str:
+    """Turn a room's second-person description into a neutral scene phrase."""
+    s = " ".join(text.split()).lower()
+    s = _LEAD.sub("", s)          # "you are standing at the end of..." -> "end of..."
+    return s[:240].strip()
+
+
 def scene_prompt(data: GameData, loc: int) -> str:
-    """The image-model prompt for a location, from its description + style guide."""
+    """The image-model prompt for a location: the shared style then the scene."""
     text = data.long_desc.get(loc, "")
     if not text or text.startswith(">$<"):
-        text = data.short_desc.get(loc) or "a mysterious chamber deep in Colossal Cave"
-    desc = " ".join(text.split())
-    return f"{STYLE_GUIDE} Scene: {desc}"
+        text = data.short_desc.get(loc) or "a mysterious chamber deep in a colossal cave"
+    return f"{STYLE_GUIDE} Scene: {_scene_subject(text)}"
 
 
 def _wrap(text: str, width: int) -> list[str]:
