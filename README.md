@@ -97,6 +97,38 @@ mode uses the `ANTHROPIC_API_KEY` from `.env`. Other commands:
 `./advent.sh logs dev`, `./advent.sh ps dev`, `./advent.sh smoke dev`,
 `./advent.sh stop dev`.
 
+## Scene images with a local open-weights model
+
+Each location's illustration is generated once and cached forever. Out of the
+box the cache is filled with placeholder cards; to use real art, generate the
+images with a local model **on a machine with a GPU/MPS (your Mac)** — Docker
+Desktop can't reach the Mac's GPU, and the images are cached, so we generate
+them natively and let the container serve them.
+
+```bash
+# One-time: install the (heavy) image deps into a host venv.
+python3.12 -m venv .venv-img && . .venv-img/bin/activate
+pip install -e "./backend[imagegen]"
+
+# Generate into the same folder compose mounts (ADVENT_SCENE_CACHE_HOST).
+python -m advent.pregen --out ./scene-cache            # SDXL-Turbo (fast)
+python -m advent.pregen --out ./scene-cache --only 1   # just one room
+python -m advent.pregen --dry-run                      # print prompts only
+```
+
+The running app picks the PNGs up immediately (real raster art is preferred
+over placeholders). Model choice (`--model`), with licensing in mind:
+
+| Model | License | Notes |
+|---|---|---|
+| `stabilityai/sdxl-turbo` (default) | non-commercial research | fastest; great for an internal demo |
+| `stabilityai/stable-diffusion-xl-base-1.0` | OpenRAIL++ (commercial OK) | ~30 steps, higher fidelity |
+| `black-forest-labs/FLUX.1-schnell` | **Apache-2.0** | best quality; wants ~24GB RAM |
+
+First run downloads the weights from HuggingFace (~7GB for SDXL). Generation is
+pluggable (`advent.imagegen.DiffusersGenerator`), so a GPU server could also
+generate on demand; on the GPU-less Dedibox, ship the pre-generated cache.
+
 ## Deploy (apps.athenadecisions.com)
 
 Served path-based at `/advent` — backend container 8040, frontend 3040 (distinct

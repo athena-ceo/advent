@@ -29,7 +29,10 @@ _EXT = {"image/svg+xml": "svg", "image/png": "png", "image/jpeg": "jpg", "image/
 
 def scene_prompt(data: GameData, loc: int) -> str:
     """The image-model prompt for a location, from its description + style guide."""
-    desc = " ".join(data.long_desc.get(loc, "").split())
+    text = data.long_desc.get(loc, "")
+    if not text or text.startswith(">$<"):
+        text = data.short_desc.get(loc) or "a mysterious chamber deep in Colossal Cave"
+    desc = " ".join(text.split())
     return f"{STYLE_GUIDE} Scene: {desc}"
 
 
@@ -84,8 +87,12 @@ class SceneStore:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.generator = generator or placeholder_svg
 
+    # Prefer real raster art over the SVG placeholder, so a pre-generated PNG
+    # wins even if a placeholder was cached earlier during play.
+    _LOOKUP_ORDER = ("png", "webp", "jpg", "svg")
+
     def _find_cached(self, loc: int) -> Path | None:
-        for ext in _EXT.values():
+        for ext in self._LOOKUP_ORDER:
             p = self.cache_dir / f"loc_{loc}.{ext}"
             if p.exists():
                 return p

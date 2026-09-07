@@ -11,11 +11,22 @@ dependencies = []
 
 [project.optional-dependencies]
 mcp = ["mcp>=2"]
+# Local open-weights image generation (heavy; install where there's a GPU/MPS).
+imagegen = [
+    "torch>=2.2",
+    "diffusers>=0.30",
+    "transformers>=4.44",
+    "accelerate>=0.33",
+    "safetensors>=0.4",
+    "sentencepiece>=0.2",
+    "protobuf>=4",
+]
 test = ["pytest>=7", "adventure>=1.4", "mcp>=2"]
 
 [project.scripts]
 advent = "advent.cli:main"
 advent-mcp = "advent.mcp_server:main"
+advent-pregen = "advent.pregen:main"
 
 [tool.setuptools]
 packages = ["advent"]
