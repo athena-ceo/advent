@@ -26,6 +26,8 @@ export const api = {
   command: (sid: string, command: string) =>
     jfetch<TurnResult>(`/games/${sid}/command`, { method: "POST", body: JSON.stringify({ command }) }),
   state: (sid: string) => jfetch<GameState>(`/games/${sid}/state`),
+  transcript: (sid: string) =>
+    jfetch<{ session_id: string; transcript: string[] }>(`/games/${sid}/transcript`),
   scene: (sid: string) => jfetch<Scene>(`/games/${sid}/scene`),
   map: (sid: string, depth?: number) =>
     jfetch<MapPayload>(`/games/${sid}/map${depth != null ? `?depth=${depth}` : ""}`),

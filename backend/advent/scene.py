@@ -37,6 +37,11 @@ STYLE_SURFACE = (
     "soft natural light, gentle mist, atmospheric, cinematic, hyper-detailed, "
     "8k, deserted"
 )
+# Title card for location 0 -- dramatic, no forced forest.
+STYLE_TITLE = (
+    "photorealistic, epic high fantasy, dramatic cinematic key art, moody dusk "
+    "light, mist and atmosphere, rugged rock, hyper-detailed, 8k, deserted"
+)
 # Back-compat alias (default look).
 STYLE_GUIDE = STYLE_UNDERGROUND
 
@@ -63,8 +68,16 @@ def _scene_subject(text: str) -> str:
     return s.strip()
 
 
+# Location 0 is "limbo" before the game places the player -- give it a title card.
+_TITLE_SCENE = ("the mouth of a vast colossal cave, a mysterious dark opening in "
+                "a rugged rocky hillside at dusk, torchlight glinting within, the "
+                "threshold of a grand adventure")
+
+
 def scene_subject_text(data: GameData, loc: int) -> str:
     """Just the scene (no style), cleaned from the room's description."""
+    if loc == 0:
+        return _TITLE_SCENE
     text = data.long_desc.get(loc, "")
     if not text or text.startswith(">$<"):
         text = data.short_desc.get(loc) or "a mysterious chamber deep in a colossal cave"
@@ -77,6 +90,8 @@ def scene_style(data: GameData, loc: int) -> str:
     The game sets the LIGHT condition bit (bit 0) on rooms that don't need the
     lamp -- i.e. the surface and a few open rooms; everything else is deep cave.
     """
+    if loc == 0:
+        return STYLE_TITLE
     lit = bool(data.cond.get(loc, 0) & 1)
     return STYLE_SURFACE if lit else STYLE_UNDERGROUND
 
@@ -102,26 +117,46 @@ def _wrap(text: str, width: int) -> list[str]:
 
 
 def placeholder_svg(data: GameData, loc: int) -> tuple[bytes, str]:
-    """A dependency-free placeholder image: a captioned, tinted card."""
-    name = (data.short_desc.get(loc) or data.long_desc.get(loc, f"Room {loc}"))
-    name = name.split("\n", 1)[0].strip()
+    """A dependency-free placeholder: a moody torch-lit stone portal card.
+
+    Suggests a mysterious passage rather than a flat swatch -- a nicer stand-in
+    until the real art is generated (and the title card for location 0).
+    """
+    if loc == 0:
+        name, body = "Colossal Cave", "A grand adventure awaits within…"
+    else:
+        name = (data.short_desc.get(loc) or data.long_desc.get(loc, f"Room {loc}"))
+        name = name.split("\n", 1)[0].strip()
+        body = " ".join(data.long_desc.get(loc, "").split())
     hue = int(hashlib.sha1(str(loc).encode()).hexdigest(), 16) % 360
-    body = " ".join(data.long_desc.get(loc, "").split())
-    lines = _wrap(body, 46)[:6]
+    lines = _wrap(body, 40)[:4]
     tspans = "".join(
-        f'<tspan x="40" dy="{28 if i else 0}">{_xml(t)}</tspan>'
-        for i, t in enumerate(lines)
+        f'<tspan x="320" dy="{24 if i else 0}">{_xml(t)}</tspan>' for i, t in enumerate(lines)
     )
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0" stop-color="hsl({hue},45%,28%)"/>
-    <stop offset="1" stop-color="hsl({(hue + 40) % 360},50%,12%)"/>
-  </linearGradient></defs>
-  <rect width="640" height="400" fill="url(#g)"/>
-  <rect x="16" y="16" width="608" height="368" fill="none" stroke="hsl({hue},40%,70%)" stroke-width="2" opacity="0.5"/>
-  <text x="40" y="70" font-family="Georgia, serif" font-size="26" fill="#f5f0e6">{_xml(name)}</text>
-  <text x="40" y="130" font-family="Georgia, serif" font-size="17" fill="#e8e0d0" opacity="0.85">{tspans}</text>
-  <text x="40" y="372" font-family="monospace" font-size="12" fill="#f5f0e6" opacity="0.6">location {loc} · placeholder — AI art pending</text>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="65%">
+      <stop offset="0" stop-color="hsl({hue},55%,26%)"/>
+      <stop offset="0.55" stop-color="hsl({(hue + 20) % 360},45%,11%)"/>
+      <stop offset="1" stop-color="#0b0906"/>
+    </radialGradient>
+    <radialGradient id="ember" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffcf7a" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="400" fill="url(#glow)"/>
+  <!-- suggestion of a carved stone archway / passage -->
+  <path d="M170 400 V150 a150 150 0 0 1 300 0 V400 Z" fill="#0d0b08" opacity="0.72"/>
+  <path d="M170 150 a150 150 0 0 1 300 0" fill="none" stroke="hsl({hue},35%,55%)"
+        stroke-width="3" opacity="0.35"/>
+  <ellipse cx="320" cy="330" rx="150" ry="60" fill="url(#ember)" opacity="0.5"/>
+  <text x="320" y="120" text-anchor="middle" font-family="Georgia, serif" font-size="30"
+        fill="#f5e6c8">{_xml(name)}</text>
+  <text x="320" y="250" text-anchor="middle" font-family="Georgia, serif" font-size="15"
+        fill="#e8dcc4" opacity="0.8">{tspans}</text>
+  <text x="320" y="384" text-anchor="middle" font-family="monospace" font-size="11"
+        fill="#f5e6c8" opacity="0.5">location {loc} · illustration pending</text>
 </svg>"""
     return svg.encode("utf-8"), "image/svg+xml"
 

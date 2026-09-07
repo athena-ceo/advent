@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
 
     data = load_default_data()
-    locs = sorted(data.long_desc)
+    locs = [0] + sorted(data.long_desc)  # 0 = the title card / cave mouth
     if args.only is not None:
         locs = [args.only]
     if args.limit is not None:

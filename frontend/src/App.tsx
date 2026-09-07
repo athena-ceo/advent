@@ -10,6 +10,8 @@ import { CommandBar } from "./components/CommandBar";
 
 type Mode = "classic" | "guided";
 
+const SESSION_KEY = "advent.session_id";
+
 export default function App() {
   const [mode, setMode] = useState<Mode>("classic");
   const [sid, setSid] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export default function App() {
     try {
       const g = await api.newGame();
       setSid(g.session_id);
+      localStorage.setItem(SESSION_KEY, g.session_id);
       setState(g.state);
       setSaveId(null);
       setLines([{ kind: "game", text: g.intro }]);
@@ -58,11 +61,36 @@ export default function App() {
     }
   }, [refreshPanels]);
 
+  // On load, reattach to the session from a previous visit (survives reloads);
+  // start a fresh game only if there isn't one, or it's gone/ended.
+  const boot = useCallback(async () => {
+    const saved = localStorage.getItem(SESSION_KEY);
+    if (saved) {
+      try {
+        const st = await api.state(saved);
+        if (!st.ended) {
+          setSid(saved);
+          setState(st);
+          try {
+            const t = await api.transcript(saved);
+            setLines([
+              { kind: "system", text: "— resumed your game —" },
+              ...t.transcript.map((text) => ({ kind: "game" as const, text })),
+            ]);
+          } catch { /* transcript is best-effort */ }
+          await refreshPanels(saved);
+          return;
+        }
+      } catch { /* stale/unknown session id -> start fresh */ }
+    }
+    await newGame();
+  }, [newGame, refreshPanels]);
+
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    void newGame();
-  }, [newGame]);
+    void boot();
+  }, [boot]);
 
   const send = async (text: string) => {
     if (!sid || busy) return;
@@ -101,6 +129,7 @@ export default function App() {
     try {
       const g = await api.restore(saveId);
       setSid(g.session_id);
+      localStorage.setItem(SESSION_KEY, g.session_id);
       setState(g.state);
       push({ kind: "system", text: "restored to the saved point." });
       push({ kind: "game", text: g.intro });
