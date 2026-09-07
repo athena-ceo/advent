@@ -80,15 +80,27 @@ say "start a game of Adventure and play it with me".
 
 (Windows: `%APPDATA%\Claude\claude_desktop_config.json`.) Restart Claude Desktop.
 
-## Docker & deploy (apps.athenadecisions.com)
+## Run locally in Docker Desktop
 
-Served path-based at `/advent` (backend container 8040 — distinct from
-golden-path 8020 and xcape 8030; the React frontend will take 3040).
+The full stack (backend + frontend) runs from `docker-compose.dev.yml`, reading
+a `.env` file — the same shape as the other Athena projects. The frontend
+container proxies `/api` to the backend, so it is self-contained (no CORS).
 
 ```bash
-./advent.sh start dev      # build + run the backend locally
-./advent.sh health dev     # curl the health probe
-./advent.sh smoke dev      # health + MCP round-trip against the running server
+cp .env.example .env          # then put your ANTHROPIC_API_KEY in it
+./advent.sh start dev         # docker compose up --build
+```
+
+Open **http://localhost:3040**. Classic mode needs no key; Guided (LLM) mode
+uses the `ANTHROPIC_API_KEY` from `.env`. Other commands: `./advent.sh logs dev`,
+`./advent.sh ps dev`, `./advent.sh smoke dev`, `./advent.sh stop dev`.
+
+## Deploy (apps.athenadecisions.com)
+
+Served path-based at `/advent` — backend container 8040, frontend 3040 (distinct
+from golden-path 8020/3020 and xcape 8030/3030).
+
+```bash
 ./advent.sh deploy prod    # git pull, build, up, health check (on the server)
 ```
 

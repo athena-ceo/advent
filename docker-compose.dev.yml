@@ -1,20 +1,42 @@
 # Copyright (c) 2026 Athena Decisions Systems SAS.
 #
-# Local development stack. Source is mounted so code edits take effect on a
-# container restart (the MCP server imports `advent` from the working dir).
+# Local full-stack run for Docker Desktop. Values come from a .env file in this
+# directory (copy .env.example to .env). Open http://localhost:3040 -- the
+# frontend proxies /api to the backend, so it is self-contained.
 
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "${BACKEND_PORT:-8040}:8000"
-    volumes:
-      - ./backend:/app
     environment:
       ENVIRONMENT: development
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ADVENT_LLM_MODEL: ${ADVENT_LLM_MODEL:-claude-opus-5}
+      ADVENT_SCENE_CACHE: /data/scene-cache
+    volumes:
+      # Live-edit backend code, and persist the scene-image cache.
+      - ./backend:/app
+      - ${ADVENT_SCENE_CACHE_HOST:-./scene-cache}:/data/scene-cache
     command: ["uvicorn", "advent.web:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks:
+      - advent-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_BASE_PATH: /
+        VITE_API_BASE: /api
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3040}:80"
+    depends_on:
+      - backend
     networks:
       - advent-network
 

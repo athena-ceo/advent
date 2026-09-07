@@ -13,3 +13,7 @@ frontend/dist/
 
 # Generated scene images (lazy image cache)
 scene-cache/
+
+# Local secrets and caches
+.env
+scene-cache/
