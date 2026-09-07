@@ -89,7 +89,9 @@ class DiffusersGenerator:
                   "height": self.size, "width": self.size}
         use_negative = bool(self.guidance and self.guidance > 0)
 
-        if "xl" in self.model.lower():
+        name = self.model.lower()
+        is_sdxl = "sdxl" in name or "stable-diffusion-xl" in name
+        if is_sdxl:
             # SDXL has two CLIP encoders (77 tokens each): scene -> encoder 1,
             # style -> encoder 2, so both apply in full without truncation.
             kwargs["prompt"] = scene_subject_text(data, loc)
