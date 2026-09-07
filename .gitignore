@@ -17,3 +17,5 @@ scene-cache/
 # Local secrets and caches
 .env
 scene-cache/
+.venv-img/
+.venv*/
