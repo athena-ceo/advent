@@ -12,14 +12,14 @@ from __future__ import annotations
 from io import BytesIO
 
 from .data import GameData
-from .scene import STYLE_GUIDE, scene_prompt, scene_subject_text
+from .scene import scene_prompt, scene_style, scene_subject_text
 
 # Sensible steps/guidance/size per model. Turbo/schnell are few-step, low-CFG.
 MODEL_DEFAULTS: dict[str, dict] = {
-    "stabilityai/sdxl-turbo": {"steps": 2, "guidance": 0.0, "size": 512},
-    "stabilityai/sd-turbo": {"steps": 2, "guidance": 0.0, "size": 512},
+    "stabilityai/sdxl-turbo": {"steps": 4, "guidance": 0.0, "size": 512},
+    "stabilityai/sd-turbo": {"steps": 4, "guidance": 0.0, "size": 512},
     "stabilityai/stable-diffusion-xl-base-1.0": {"steps": 30, "guidance": 7.0, "size": 768},
-    "black-forest-labs/FLUX.1-schnell": {"steps": 4, "guidance": 0.0, "size": 1024},
+    "black-forest-labs/FLUX.1-schnell": {"steps": 4, "guidance": 0.0, "size": 768},
     "runwayml/stable-diffusion-v1-5": {"steps": 28, "guidance": 7.5, "size": 512},
 }
 
@@ -35,6 +35,20 @@ def pick_device() -> str:
     if torch.cuda.is_available():
         return "cuda"
     return "cpu"
+
+
+def _quiet_libraries() -> None:
+    """Silence torch/transformers/diffusers advisory warnings (not errors)."""
+    import warnings
+
+    warnings.filterwarnings("ignore")
+    try:
+        from diffusers.utils import logging as dlog
+        from transformers.utils import logging as tlog
+        dlog.set_verbosity_error()
+        tlog.set_verbosity_error()
+    except Exception:
+        pass
 
 
 class DiffusersGenerator:
@@ -58,25 +72,16 @@ class DiffusersGenerator:
         import torch
         from diffusers import AutoPipelineForText2Image
 
-        dtype = torch.float32 if self.device == "cpu" else torch.float16
+        if self.device == "cpu":
+            dtype = torch.float32
+        elif "flux" in self.model.lower():
+            dtype = torch.bfloat16          # FLUX is numerically happiest in bf16
+        else:
+            dtype = torch.float16
         pipe = AutoPipelineForText2Image.from_pretrained(self.model, torch_dtype=dtype)
         pipe = pipe.to(self.device)
         pipe.set_progress_bar_config(disable=True)
         self._pipe = pipe
-
-
-def _quiet_libraries() -> None:
-    """Silence torch/transformers/diffusers advisory warnings (not errors)."""
-    import warnings
-
-    warnings.filterwarnings("ignore")
-    try:
-        from diffusers.utils import logging as dlog
-        dlog.set_verbosity_error()
-        from transformers.utils import logging as tlog
-        tlog.set_verbosity_error()
-    except Exception:
-        pass
 
     def __call__(self, data: GameData, loc: int) -> tuple[bytes, str]:
         self._ensure_pipe()
@@ -88,7 +93,7 @@ def _quiet_libraries() -> None:
             # SDXL has two CLIP encoders (77 tokens each): scene -> encoder 1,
             # style -> encoder 2, so both apply in full without truncation.
             kwargs["prompt"] = scene_subject_text(data, loc)
-            kwargs["prompt_2"] = STYLE_GUIDE
+            kwargs["prompt_2"] = scene_style(data, loc)
             if use_negative:
                 kwargs["negative_prompt"] = NEGATIVE
                 kwargs["negative_prompt_2"] = NEGATIVE

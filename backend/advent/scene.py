@@ -19,17 +19,26 @@ from pathlib import Path
 
 from .data import GameData
 
-# Photorealistic high fantasy -- Myst, but more fantastical. On SDXL this is sent
-# to the *second* text encoder (its own 77-token budget), so it applies in full
-# to every room without crowding out the scene; on other models it is appended
-# to the scene. Keep it under ~77 tokens.
-STYLE_GUIDE = (
-    "photorealistic high fantasy in the spirit of Myst but more fantastical, "
-    "a still uninhabited cinematic establishing shot, ancient hand-built "
-    "stonework meeting an otherworldly landscape, volumetric light, drifting "
-    "mist, weathered textures, physically based rendering, ray-traced global "
-    "illumination, hyper-detailed, 8k, deserted and empty, no signage"
+# Photorealistic high fantasy. Most of the game is deep underground, so the
+# default look is a vast Moria/Erebor cavern; the handful of surface rooms (which
+# the game marks as naturally lit) get an outdoor variant instead. On SDXL each
+# style is sent to the second text encoder (its own 77-token budget); on T5
+# models it is appended to the scene. Keep each under ~77 tokens.
+# These are *modifiers* -- medium, setting, lighting, mood -- NOT scene content.
+# The scene text decides what is actually in the picture (a small brick building
+# vs. a vast hall); the style must not name architecture or it hijacks the image.
+STYLE_UNDERGROUND = (
+    "photorealistic, high fantasy, deep underground, lit only by warm torchlight "
+    "against near-total darkness, bare rock, damp stone, cool shadows, "
+    "atmospheric haze, cinematic, dramatic, hyper-detailed, 8k, deserted"
 )
+STYLE_SURFACE = (
+    "photorealistic, high fantasy, outdoors in daylight, lush green forest, "
+    "soft natural light, gentle mist, atmospheric, cinematic, hyper-detailed, "
+    "8k, deserted"
+)
+# Back-compat alias (default look).
+STYLE_GUIDE = STYLE_UNDERGROUND
 
 # Second-person openings the game uses, stripped so the prompt reads as a scene.
 # Each token requires a trailing space so e.g. "in" won't eat the "in" of "inside".
@@ -62,11 +71,21 @@ def scene_subject_text(data: GameData, loc: int) -> str:
     return _scene_subject(text)
 
 
+def scene_style(data: GameData, loc: int) -> str:
+    """Surface style for naturally-lit outdoor rooms, cavern style otherwise.
+
+    The game sets the LIGHT condition bit (bit 0) on rooms that don't need the
+    lamp -- i.e. the surface and a few open rooms; everything else is deep cave.
+    """
+    lit = bool(data.cond.get(loc, 0) & 1)
+    return STYLE_SURFACE if lit else STYLE_UNDERGROUND
+
+
 def scene_prompt(data: GameData, loc: int) -> str:
     """The combined prompt (scene then style) for display and single-encoder /
     T5 models. On SDXL the generator instead sends the scene and style to the
     two separate encoders (see ``imagegen``)."""
-    return f"{scene_subject_text(data, loc)} — {STYLE_GUIDE}"
+    return f"{scene_subject_text(data, loc)} — {scene_style(data, loc)}"
 
 
 def _wrap(text: str, width: int) -> list[str]:
