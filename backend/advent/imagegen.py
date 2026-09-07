@@ -54,6 +54,7 @@ class DiffusersGenerator:
     def _ensure_pipe(self):
         if self._pipe is not None:
             return
+        _quiet_libraries()
         import torch
         from diffusers import AutoPipelineForText2Image
 
@@ -62,6 +63,20 @@ class DiffusersGenerator:
         pipe = pipe.to(self.device)
         pipe.set_progress_bar_config(disable=True)
         self._pipe = pipe
+
+
+def _quiet_libraries() -> None:
+    """Silence torch/transformers/diffusers advisory warnings (not errors)."""
+    import warnings
+
+    warnings.filterwarnings("ignore")
+    try:
+        from diffusers.utils import logging as dlog
+        dlog.set_verbosity_error()
+        from transformers.utils import logging as tlog
+        tlog.set_verbosity_error()
+    except Exception:
+        pass
 
     def __call__(self, data: GameData, loc: int) -> tuple[bytes, str]:
         self._ensure_pipe()
