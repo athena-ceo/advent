@@ -6,7 +6,13 @@ import pytest
 
 from advent import cavemap
 from advent.data import load_default_data
-from advent.scene import STYLE_GUIDE, SceneStore, scene_prompt
+from advent.scene import (
+    STYLE_SURFACE,
+    STYLE_UNDERGROUND,
+    SceneStore,
+    scene_prompt,
+    scene_style,
+)
 
 
 @pytest.fixture(scope="module")
@@ -48,14 +54,17 @@ def test_mermaid_renders(data):
 
 
 def test_scene_prompt_and_store(tmp_path, data):
-    assert STYLE_GUIDE in scene_prompt(data, 1)
+    # Surface rooms (lit) get the daylight style; deep rooms get the cavern one.
+    assert STYLE_SURFACE in scene_prompt(data, 1)          # room 1 = surface
+    assert STYLE_UNDERGROUND in scene_prompt(data, 19)     # room 19 = deep cave
+    assert scene_style(data, 1) == STYLE_SURFACE
 
     store = SceneStore(cache_dir=tmp_path)
     first = store.get(data, 3)
     assert first["cached"] is False
     assert first["data_uri"].startswith("data:image/svg+xml;base64,")
     assert first["mimetype"] == "image/svg+xml"
-    assert STYLE_GUIDE in first["prompt"]
+    assert scene_style(data, 3) in first["prompt"]
 
     # A cached file now exists and is served without regenerating.
     assert (tmp_path / "loc_3.svg").exists()
