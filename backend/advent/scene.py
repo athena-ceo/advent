@@ -31,6 +31,11 @@ from .data import GameData
 # room picks one by whether it's lit (surface) or deep cave (underground); the
 # scene text supplies the content, so styles must NOT name architecture. Keep
 # each under ~77 tokens (SDXL's per-encoder budget).
+# Each style adds a fourth string, ``world`` -- a short "world bible" of recurring
+# materials, palette and atmosphere that is threaded into *every* prompt in that
+# style. Independent diffusion images never share content, but a shared world
+# clause (plus a fixed per-style seed, see imagegen) pulls the whole bank toward
+# one coherent look -- the same granite, brass and torch-glow room to room.
 STYLES: dict[str, dict[str, str]] = {
     "photoreal": {
         "surface": ("photorealistic, high fantasy, outdoors in daylight, lush green "
@@ -43,6 +48,8 @@ STYLES: dict[str, dict[str, str]] = {
         "title": ("photorealistic, epic high fantasy, dramatic cinematic key art, "
                   "moody dusk light, mist and atmosphere, rugged rock, hyper-detailed, "
                   "8k, deserted"),
+        "world": ("one coherent world: weathered grey granite, deep green moss, aged "
+                  "brass and oak, warm amber torch-glow, cool teal shadows"),
     },
     "fantasy": {
         "surface": ("digital painting, high fantasy concept art, painterly, luminous "
@@ -53,6 +60,8 @@ STYLES: dict[str, dict[str, str]] = {
                         "atmospheric, trending on artstation, deserted"),
         "title": ("epic high fantasy concept art, painterly key art, dramatic dusk, "
                   "mist, sweeping vista, trending on artstation, deserted"),
+        "world": ("one coherent world: mossy grey stone, emerald and gold, glowing "
+                  "amber light, rich jewel-toned shadows"),
     },
     "anime": {
         "surface": ("anime background art, Studio Ghibli inspired, hand-painted, bright "
@@ -61,6 +70,8 @@ STYLES: dict[str, dict[str, str]] = {
                         "torchlit cavern, dramatic shadows, glowing light, cel shaded, "
                         "detailed, deserted"),
         "title": ("anime key visual, epic dusk vista, hand-painted, cinematic, deserted"),
+        "world": ("one coherent world: soft painted skies, verdant greens, warm lantern "
+                  "light, clean cel-shaded palette"),
     },
     "cartoon": {
         "surface": ("stylized 3d cartoon render, Pixar style, vibrant daylight forest, "
@@ -68,6 +79,8 @@ STYLES: dict[str, dict[str, str]] = {
         "underground": ("stylized 3d cartoon render, Pixar style, torchlit cavern, warm "
                         "glow, cozy dramatic lighting, clean shapes, deserted"),
         "title": ("stylized 3d cartoon key art, adventurous dusk vista, playful, deserted"),
+        "world": ("one coherent world: rounded rock, bright saturated palette, cozy "
+                  "warm glow, soft ambient occlusion"),
     },
     "watercolor": {
         "surface": ("delicate watercolor painting, soft washes, loose ink linework, "
@@ -75,7 +88,69 @@ STYLES: dict[str, dict[str, str]] = {
         "underground": ("delicate watercolor painting, soft washes, ink linework, "
                         "torchlit cavern, moody, muted palette, deserted"),
         "title": ("watercolor and ink key art, misty dusk vista, loose linework, deserted"),
+        "world": ("one coherent world: soft granulating washes, sepia and slate, warm "
+                  "ochre light, paper texture"),
     },
+    # --- new, more adventurous libraries ---
+    "oil": {
+        "surface": ("classical Romantic-era oil painting, thick impasto brushwork, "
+                    "sublime daylight forest, golden hour, luminous mist, Hudson River "
+                    "School, museum quality, deserted"),
+        "underground": ("classical Romantic-era oil painting, chiaroscuro, torchlit "
+                        "cavern, deep umber shadows, dramatic sublime scale, thick "
+                        "impasto, museum quality, deserted"),
+        "title": ("Romantic sublime oil painting, dramatic dusk vista, luminous sky, "
+                  "thick brushwork, museum quality, deserted"),
+        "world": ("one coherent world: burnt umber and raw sienna, gold-leaf highlights, "
+                  "candle-warm glow, old-master varnish"),
+    },
+    "woodcut": {
+        "surface": ("antique woodcut engraving, hand-inked etching, fine cross-hatching, "
+                    "sepia on aged parchment, vintage map illustration, bold linework, "
+                    "deserted"),
+        "underground": ("antique woodcut engraving, dense cross-hatching, dramatic black "
+                        "shadows, torchlit cavern, sepia on aged parchment, vintage "
+                        "manuscript, bold linework, deserted"),
+        "title": ("antique woodcut frontispiece, engraved title vista, cross-hatching, "
+                  "sepia parchment, ornate, deserted"),
+        "world": ("one coherent world: monochrome sepia ink on parchment, engraved "
+                  "cross-hatched texture, high-contrast linework"),
+    },
+    "comic": {
+        "surface": ("graphic novel comic art, bold black ink outlines, dynamic cel "
+                    "shading, halftone dots, vivid flat colors, daylight forest, "
+                    "dramatic, deserted"),
+        "underground": ("graphic novel comic art, heavy black ink, dramatic shadows, "
+                        "torchlit cavern, halftone shading, vivid spot color, high "
+                        "contrast, deserted"),
+        "title": ("comic book splash page, bold ink, dramatic dusk vista, halftone, "
+                  "vivid color, deserted"),
+        "world": ("one coherent world: bold ink outlines, limited vivid palette, "
+                  "halftone shadows, warm spotlight glow"),
+    },
+}
+
+# A lit *indoor* room (the well house) must not get the outdoor "surface" look or
+# it renders as a forest facade. This enclosed-interior look is used for lit rooms
+# whose description says we're inside; dark rooms always use the cavern look.
+_INTERIOR_LOOK: dict[str, str] = {
+    "photoreal": ("photorealistic, dim enclosed stone chamber interior, warm light "
+                  "from a doorway, damp rock walls, indoors, cinematic, hyper-detailed, "
+                  "8k, deserted"),
+    "fantasy": ("digital painting, enclosed stone chamber interior, warm shafts of "
+                "light, painterly, atmospheric, trending on artstation, deserted"),
+    "anime": ("anime background art, cozy enclosed stone room interior, warm light, "
+              "hand-painted, cel shaded, detailed, deserted"),
+    "cartoon": ("stylized 3d cartoon render, Pixar style, cozy stone room interior, "
+                "warm glow, clean shapes, deserted"),
+    "watercolor": ("delicate watercolor, enclosed stone room interior, soft warm light, "
+                   "muted palette, loose ink linework, deserted"),
+    "oil": ("classical oil painting, dim stone chamber interior, warm candlelight, "
+            "chiaroscuro, thick impasto, museum quality, deserted"),
+    "woodcut": ("antique woodcut engraving, enclosed stone chamber interior, cross-"
+                "hatching, sepia on parchment, bold linework, deserted"),
+    "comic": ("graphic novel comic art, enclosed stone room interior, bold ink, warm "
+              "spotlight, halftone shading, vivid color, deserted"),
 }
 
 DEFAULT_STYLE = "photoreal"
@@ -93,13 +168,20 @@ def resolve_style(style: str | None) -> str:
 
 # Second-person openings the game uses, stripped so the prompt reads as a scene.
 # Each token requires a trailing space so e.g. "in" won't eat the "in" of "inside".
+# NB: "inside"/"within" are deliberately NOT stripped -- they carry interior
+# meaning, and dropping them made "you are inside a building" render as an
+# exterior (see scene_subject_text's interior handling).
 _LEAD = re.compile(
     r"^you(?:'re| are)\s+(?:now\s+|really\s+)?"
     r"(?:(?:standing|sitting|walking|crawling|lying)\s+)?"
-    r"(?:(?:at|in|on|inside|atop|near|by|beside)\s+)?"
+    r"(?:(?:at|in|on|atop|near|by|beside)\s+)?"
     r"(?:the\s+)?",
     re.IGNORECASE,
 )
+
+# Rooms whose description says we are indoors: the model must show an interior,
+# not the building's facade. Cave rooms already read as interiors via the style.
+_INTERIOR = re.compile(r"\b(?:inside|within)\b", re.IGNORECASE)
 
 _EXT = {"image/svg+xml": "svg", "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 
@@ -127,7 +209,11 @@ def scene_subject_text(data: GameData, loc: int) -> str:
     text = data.long_desc.get(loc, "")
     if not text or text.startswith(">$<"):
         text = data.short_desc.get(loc) or "a mysterious chamber deep in a colossal cave"
-    return _scene_subject(text)
+    subject = _scene_subject(text)
+    # Force an interior view for indoor rooms, so a building reads as its inside.
+    if _INTERIOR.search(text) and not subject.startswith(("interior", "inside")):
+        subject = f"interior view, indoors, {subject}"
+    return subject
 
 
 def scene_style(data: GameData, loc: int, style: str = DEFAULT_STYLE) -> str:
@@ -138,11 +224,19 @@ def scene_style(data: GameData, loc: int, style: str = DEFAULT_STYLE) -> str:
     (bit 0) on rooms that don't need the lamp -- the surface and a few open
     rooms; everything else is deep cave.
     """
-    variants = STYLES[resolve_style(style)]
+    name = resolve_style(style)
+    variants = STYLES[name]
+    world = variants.get("world", "")
     if loc == 0:
-        return variants["title"]
-    lit = bool(data.cond.get(loc, 0) & 1)
-    return variants["surface"] if lit else variants["underground"]
+        look = variants["title"]
+    else:
+        lit = bool(data.cond.get(loc, 0) & 1)
+        text = data.long_desc.get(loc, "") or data.short_desc.get(loc, "")
+        if lit and _INTERIOR.search(text):
+            look = _INTERIOR_LOOK.get(name, variants["underground"])
+        else:
+            look = variants["surface"] if lit else variants["underground"]
+    return f"{look}, {world}" if world else look
 
 
 def scene_prompt(data: GameData, loc: int, style: str = DEFAULT_STYLE) -> str:

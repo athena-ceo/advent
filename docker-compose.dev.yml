@@ -17,10 +17,15 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ADVENT_LLM_MODEL: ${ADVENT_LLM_MODEL:-claude-opus-5}
       ADVENT_SCENE_CACHE: /data/scene-cache
+      ADVENT_SPRITE_CACHE: /data/sprite-cache
+      ADVENT_COMPOSITE_CACHE: /data/composite-cache
     volumes:
-      # Live-edit backend code, and persist the scene-image cache.
+      # Live-edit backend code, and persist the image caches (scene plates,
+      # object sprites, and the composited results).
       - ./backend:/app
       - ${ADVENT_SCENE_CACHE_HOST:-./scene-cache}:/data/scene-cache
+      - ${ADVENT_SPRITE_CACHE_HOST:-./sprite-cache}:/data/sprite-cache
+      - ${ADVENT_COMPOSITE_CACHE_HOST:-./composite-cache}:/data/composite-cache
     command: ["uvicorn", "advent.web:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     networks:
       - advent-network

@@ -28,7 +28,9 @@ export const api = {
   state: (sid: string) => jfetch<GameState>(`/games/${sid}/state`),
   transcript: (sid: string) =>
     jfetch<{ session_id: string; transcript: string[] }>(`/games/${sid}/transcript`),
-  scene: (sid: string) => jfetch<Scene>(`/games/${sid}/scene`),
+  scene: (sid: string, style?: string) =>
+    jfetch<Scene>(`/games/${sid}/scene${style ? `?style=${encodeURIComponent(style)}` : ""}`),
+  styles: () => jfetch<{ styles: string[]; default: string }>("/styles"),
   map: (sid: string, depth?: number) =>
     jfetch<MapPayload>(`/games/${sid}/map${depth != null ? `?depth=${depth}` : ""}`),
   save: (sid: string) => jfetch<{ save_id: string }>(`/games/${sid}/save`, { method: "POST" }),

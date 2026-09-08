@@ -16,10 +16,16 @@ from __future__ import annotations
 
 import argparse
 import sys
+import zlib
 from pathlib import Path
 
 from .data import load_default_data
 from .scene import DEFAULT_STYLE, STYLES, resolve_style, scene_prompt
+
+
+def _style_seed(style: str) -> int:
+    """A stable base seed per style, so each bank is reproducible and coherent."""
+    return zlib.crc32(style.encode()) & 0x7FFFFFFF
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,10 +42,17 @@ def main(argv: list[str] | None = None) -> int:
                    help="comma-separated location number(s) to generate, e.g. 130,131,132")
     p.add_argument("--limit", type=int, default=None, help="generate at most N locations")
     p.add_argument("--overwrite", action="store_true", help="regenerate even if cached")
+    p.add_argument("--seed", type=int, default=None,
+                   help="base seed for a coherent, reproducible bank "
+                        "(default: a stable per-style seed; -1 = fully random)")
     p.add_argument("--dry-run", action="store_true", help="print prompts, don't generate")
     args = p.parse_args(argv)
 
     style = resolve_style(args.style)
+    if args.seed is None:
+        seed: int | None = _style_seed(style)
+    else:
+        seed = None if args.seed < 0 else args.seed
     data = load_default_data()
     locs = [0] + sorted(data.long_desc)  # 0 = the title card / cave mouth
     if args.only is not None:
@@ -59,9 +72,9 @@ def main(argv: list[str] | None = None) -> int:
     from .imagegen import DiffusersGenerator
 
     gen = DiffusersGenerator(args.model, steps=args.steps, guidance=args.guidance,
-                             size=args.size, style=style)
+                             size=args.size, style=style, seed=seed)
     print(f"model={args.model} style={style} device={gen.device} steps={gen.steps} "
-          f"guidance={gen.guidance} size={gen.size}")
+          f"guidance={gen.guidance} size={gen.size} seed={seed}")
 
     made = skipped = 0
     for i, loc in enumerate(locs, 1):

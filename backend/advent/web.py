@@ -27,6 +27,7 @@ sessions = SessionManager()
 chat_histories: dict[str, list] = {}
 
 _SPRITE_DIR = os.environ.get("ADVENT_SPRITE_CACHE", "./sprite-cache")
+_COMPOSITE_DIR = os.environ.get("ADVENT_COMPOSITE_CACHE")  # None -> derived next to scenes
 _composers: dict[str, SceneComposer] = {}
 
 
@@ -35,7 +36,8 @@ def get_composer(style: str | None) -> SceneComposer:
     style = resolve_style(style)
     comp = _composers.get(style)
     if comp is None:
-        comp = SceneComposer(SceneStore(style=style), _SPRITE_DIR)
+        comp = SceneComposer(SceneStore(style=style), _SPRITE_DIR,
+                             composite_dir=_COMPOSITE_DIR)
         _composers[style] = comp
     return comp
 

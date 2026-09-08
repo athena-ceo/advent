@@ -57,7 +57,7 @@ def test_scene_prompt_and_store(tmp_path, data):
     # Surface rooms (lit) get the daylight style; deep rooms get the cavern one.
     assert STYLE_SURFACE in scene_prompt(data, 1)          # room 1 = surface
     assert STYLE_UNDERGROUND in scene_prompt(data, 19)     # room 19 = deep cave
-    assert scene_style(data, 1) == STYLE_SURFACE
+    assert STYLE_SURFACE in scene_style(data, 1)  # look + shared world bible
 
     store = SceneStore(cache_dir=tmp_path)
     first = store.get(data, 3)

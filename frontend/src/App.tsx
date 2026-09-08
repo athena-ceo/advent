@@ -11,6 +11,9 @@ import { CommandBar } from "./components/CommandBar";
 type Mode = "classic" | "guided";
 
 const SESSION_KEY = "advent.session_id";
+const LEFT_KEY = "advent.leftFrac";
+const MAP_KEY = "advent.showMap";
+const STYLE_KEY = "advent.style";
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("classic");
@@ -25,24 +28,74 @@ export default function App() {
   const [mapDepth, setMapDepth] = useState<number | undefined>(1);
   const started = useRef(false);
 
+  // --- UI layout preferences (persisted) ---
+  const [leftFrac, setLeftFrac] = useState(() => {
+    const v = parseFloat(localStorage.getItem(LEFT_KEY) ?? "");
+    return Number.isFinite(v) && v > 0.2 && v < 0.85 ? v : 0.55;
+  });
+  const [showMap, setShowMap] = useState(() => localStorage.getItem(MAP_KEY) === "1");
+  const [styles, setStyles] = useState<string[]>([]);
+  const [style, setStyle] = useState<string>(() => localStorage.getItem(STYLE_KEY) ?? "");
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { localStorage.setItem(LEFT_KEY, String(leftFrac)); }, [leftFrac]);
+  useEffect(() => { localStorage.setItem(MAP_KEY, showMap ? "1" : "0"); }, [showMap]);
+  useEffect(() => { if (style) localStorage.setItem(STYLE_KEY, style); }, [style]);
+
+  // Available style libraries (photoreal / fantasy / …) come from the backend.
+  useEffect(() => {
+    api.styles().then((s) => {
+      setStyles(s.styles);
+      setStyle((cur) => cur || s.default);
+    }).catch(() => { /* styles are best-effort; empty menu just hides it */ });
+  }, []);
+
+  const startDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const el = mainRef.current;
+    if (!el) return;
+    const onMove = (ev: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      const frac = (ev.clientX - r.left) / r.width;
+      setLeftFrac(Math.min(0.82, Math.max(0.25, frac)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+
   const push = (line: Line) => setLines((ls) => [...ls, line]);
 
   const refreshPanels = useCallback(async (id: string) => {
     setSceneLoading(true);
     try {
-      const [sc, mp] = await Promise.all([api.scene(id), api.map(id, mapDepth)]);
+      const [sc, mp] = await Promise.all([api.scene(id, style), api.map(id, mapDepth)]);
       setScene(sc);
       setMapCode(mp.mermaid);
     } catch { /* panels are best-effort */ } finally {
       setSceneLoading(false);
     }
-  }, [mapDepth]);
+  }, [mapDepth, style]);
 
   // Refetch just the map when the depth control changes.
   useEffect(() => {
     if (!sid) return;
     api.map(sid, mapDepth).then((m) => setMapCode(m.mermaid)).catch(() => {});
   }, [mapDepth, sid]);
+
+  // Re-render the current scene in the chosen style library.
+  useEffect(() => {
+    if (!sid || !style) return;
+    setSceneLoading(true);
+    api.scene(sid, style).then(setScene).catch(() => {}).finally(() => setSceneLoading(false));
+  }, [style, sid]);
 
   const newGame = useCallback(async () => {
     setBusy(true);
@@ -141,6 +194,8 @@ export default function App() {
     }
   };
 
+  const btn = "px-3 py-1 rounded bg-cave-700 border border-cave-600 hover:border-amber-glow/60 disabled:opacity-40";
+
   return (
     <div className="h-full flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-cave-600 bg-cave-800">
@@ -157,17 +212,28 @@ export default function App() {
               </button>
             ))}
           </div>
-          <button onClick={save} disabled={!sid || busy}
-            className="px-3 py-1 rounded bg-cave-700 border border-cave-600 hover:border-amber-glow/60 disabled:opacity-40">Save</button>
-          <button onClick={restore} disabled={!saveId || busy}
-            className="px-3 py-1 rounded bg-cave-700 border border-cave-600 hover:border-amber-glow/60 disabled:opacity-40">Restore</button>
-          <button onClick={newGame} disabled={busy}
-            className="px-3 py-1 rounded bg-cave-700 border border-cave-600 hover:border-amber-glow/60 disabled:opacity-40">New</button>
+          {styles.length > 0 && (
+            <select value={style} onChange={(e) => setStyle(e.target.value)}
+              title="Image style library"
+              className="px-2 py-1 rounded bg-cave-700 border border-cave-600 hover:border-amber-glow/60 capitalize">
+              {styles.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          <button onClick={() => setShowMap((v) => !v)}
+            className={`px-3 py-1 rounded border ${showMap
+              ? "bg-amber-glow text-cave-900 border-amber-glow font-semibold"
+              : "bg-cave-700 border-cave-600 hover:border-amber-glow/60"}`}>
+            Map
+          </button>
+          <button onClick={save} disabled={!sid || busy} className={btn}>Save</button>
+          <button onClick={restore} disabled={!saveId || busy} className={btn}>Restore</button>
+          <button onClick={newGame} disabled={busy} className={btn}>New</button>
         </div>
       </header>
 
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 p-4 overflow-hidden">
-        <section className="flex flex-col rounded-lg border border-cave-600 bg-cave-800 overflow-hidden min-h-0">
+      <main ref={mainRef} className="flex-1 flex flex-col lg:flex-row gap-3 p-4 overflow-hidden">
+        <section style={{ flexBasis: `${leftFrac * 100}%` }}
+          className="flex flex-col rounded-lg border border-cave-600 bg-cave-800 overflow-hidden min-h-0 lg:min-w-0">
           <Transcript lines={lines} />
           <CommandBar
             onSend={send}
@@ -176,12 +242,23 @@ export default function App() {
           />
         </section>
 
-        <aside className="flex flex-col gap-4 overflow-y-auto scroll-thin min-h-0">
+        {/* Draggable divider (desktop only); double-click resets the split. */}
+        <div onMouseDown={startDrag} onDoubleClick={() => setLeftFrac(0.55)}
+          title="Drag to resize · double-click to reset"
+          className="hidden lg:flex shrink-0 w-2 items-center justify-center cursor-col-resize group">
+          <div className="w-0.5 h-16 rounded bg-cave-600 group-hover:bg-amber-glow/70" />
+        </div>
+
+        <aside className="flex-1 flex flex-col gap-3 min-h-0 min-w-0">
           <ScenePanel scene={scene} loading={sceneLoading} />
-          <StatusBar state={state} onAction={send} />
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-cave-600 mb-1 px-1">Cave map</div>
-            <MapPanel code={mapCode} depth={mapDepth} onDepth={setMapDepth} />
+          <div className="shrink-0 flex flex-col gap-3 overflow-y-auto scroll-thin max-h-[55%]">
+            <StatusBar state={state} onAction={send} />
+            {showMap && (
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-cave-600 mb-1 px-1">Cave map</div>
+                <MapPanel code={mapCode} depth={mapDepth} onDepth={setMapDepth} />
+              </div>
+            )}
           </div>
         </aside>
       </main>

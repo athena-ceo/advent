@@ -57,7 +57,8 @@ class DiffusersGenerator:
 
     def __init__(self, model: str = "stabilityai/sdxl-turbo", *, steps: int | None = None,
                  guidance: float | None = None, size: int | None = None,
-                 device: str | None = None, style: str = DEFAULT_STYLE):
+                 device: str | None = None, style: str = DEFAULT_STYLE,
+                 seed: int | None = None):
         d = MODEL_DEFAULTS.get(model, {"steps": 20, "guidance": 5.0, "size": 512})
         self.model = model
         self.steps = steps if steps is not None else d["steps"]
@@ -65,7 +66,24 @@ class DiffusersGenerator:
         self.size = size if size is not None else d["size"]
         self.device = device or pick_device()
         self.style = style
+        # A fixed base seed makes a whole bank reproducible and pulls its images
+        # toward one coherent "hand"; each room offsets from it (seed + loc) so
+        # rooms still differ. None -> the model's own random seed each call.
+        self.seed = seed
         self._pipe = None
+
+    def _generator(self, offset: int):
+        """A torch RNG seeded for this room, or None for fully random output."""
+        if self.seed is None:
+            return None
+        import torch
+        # MPS has no native Generator; a CPU generator is deterministic and works
+        # for seeding the initial latents on all backends.
+        dev = "cpu" if self.device == "mps" else self.device
+        try:
+            return torch.Generator(device=dev).manual_seed(self.seed + offset)
+        except Exception:
+            return torch.Generator().manual_seed(self.seed + offset)
 
     def _ensure_pipe(self):
         if self._pipe is not None:
@@ -96,6 +114,9 @@ class DiffusersGenerator:
         self._ensure_pipe()
         kwargs = {"num_inference_steps": self.steps, "guidance_scale": self.guidance,
                   "height": self.size, "width": self.size}
+        gen = self._generator(loc)
+        if gen is not None:
+            kwargs["generator"] = gen
         use_negative = bool(self.guidance and self.guidance > 0)
 
         name = self.model.lower()
