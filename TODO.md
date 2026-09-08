@@ -20,6 +20,20 @@ Working notes / backlog. We work directly on `main` (solo project, no PRs).
 - [ ] **GitHub housekeeping**: set the repo default branch to `main`, then delete
       the leftover `master` branch (kept for now because it may be the default).
 
+## Objects & creatures in scenes (next feature)
+Layer inventory items and creatures onto room images **without** regenerating
+every combination.
+- [ ] **Sprite compositing (recommended):** generate one transparent sprite per
+      object/creature once (SD has no alpha → cut out with `rembg` or a matte);
+      the backend pastes the currently-present sprites onto the base room plate
+      based on the engine's `visible_objects`/creatures. Cache each composite by
+      `(location, frozenset(present sprite+prop))` — only *visited* states, and
+      each is a cheap PIL paste, so cost is linear (rooms + objects), not
+      combinatorial. Needs a small per-object `{anchor, scale}` placement config.
+- [ ] Optional hero-moment upgrade: AI **inpaint** a few key creatures (dragon,
+      troll) into the plate for integrated lighting, cached by the same key.
+- [ ] Fallback: draw item/creature markers in the frontend over the image.
+
 ## Polish / nice-to-have
 - [ ] Guided (LLM) mode: sanity-check behaviour with a real key; tune the system
       prompt in `backend/advent/chat.py` if it still over-narrates.
