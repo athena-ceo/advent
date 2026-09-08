@@ -41,7 +41,7 @@ def main() -> int:
         state = _post(f"/api/games/{sid}/command", {"command": cmd})["state"]
     assert state["location"] == 3, f"expected building (3), got {state['location']}"
     inv_names = [o["name"] for o in state["inventory"]]
-    assert "BRASS LANTERN" in inv_names, inv_names
+    assert any(n.lower() == "brass lantern" for n in inv_names), inv_names
     print(f"[smoke] played 3 turns: loc={state['location']} "
           f"inventory={inv_names} score={state['score']}")
 

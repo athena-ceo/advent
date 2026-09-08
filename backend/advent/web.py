@@ -19,11 +19,40 @@ from . import cavemap
 from .data import load_default_data
 from .scene import SceneStore
 from .session import SessionManager
+from .text import sentence_case as sc
 
 GAME_DATA = load_default_data()
 sessions = SessionManager()
 scenes = SceneStore()
 chat_histories: dict[str, list] = {}
+
+
+def _pretty_state(st: dict) -> dict:
+    """Sentence-case the engine text in a state dict for display (copy)."""
+    st = dict(st)
+    st["name"] = sc(st.get("name", ""))
+    st["description"] = sc(st.get("description", ""))
+    st["visible_objects"] = [{"name": sc(o["name"]), "word": o["word"]}
+                             for o in st.get("visible_objects", [])]
+    st["inventory"] = [{"name": sc(o["name"]), "word": o["word"]}
+                       for o in st.get("inventory", [])]
+    return st  # exits are motion words, already lower-case
+
+
+def _pretty_turn(r: dict) -> dict:
+    return {"output": sc(r["output"]), "ended": r["ended"],
+            "state": _pretty_state(r["state"])}
+
+
+def _pretty_map(payload: dict) -> dict:
+    """Sentence-case the map's node labels (and rebuild the Mermaid from them)."""
+    nodes = {n["id"]: sc(n["name"]) for n in payload["graph"]["nodes"]}
+    edges = payload["graph"]["edges"]
+    payload = dict(payload)
+    payload["graph"] = {"nodes": [{"id": i, "name": nm} for i, nm in nodes.items()],
+                        "edges": edges}
+    payload["mermaid"] = cavemap.to_mermaid(nodes, edges, highlight=payload.get("center"))
+    return payload
 
 app = FastAPI(title="Adventure", version="0.1.0")
 
@@ -67,22 +96,24 @@ def health():
 @app.post("/api/games")
 def new_game(body: NewGame):
     session = sessions.create(seed=body.seed)
-    return {"session_id": session.id, "intro": session.intro, "state": session.state()}
+    return {"session_id": session.id, "intro": sc(session.intro),
+            "state": _pretty_state(session.state())}
 
 
 @app.post("/api/games/{session_id}/command")
 def command(session_id: str, body: Command):
-    return _session(session_id).command(body.command)
+    return _pretty_turn(_session(session_id).command(body.command))
 
 
 @app.get("/api/games/{session_id}/state")
 def state(session_id: str):
-    return _session(session_id).state()
+    return _pretty_state(_session(session_id).state())
 
 
 @app.get("/api/games/{session_id}/transcript")
 def transcript(session_id: str):
-    return {"session_id": session_id, "transcript": _session(session_id).transcript()}
+    return {"session_id": session_id,
+            "transcript": [sc(t) for t in _session(session_id).transcript()]}
 
 
 @app.post("/api/games/{session_id}/save")
@@ -96,14 +127,15 @@ def restore_game(body: Restore):
     session = sessions.restore(body.save_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"no such save: {body.save_id}")
-    return {"session_id": session.id, "output": session.intro, "state": session.state()}
+    return {"session_id": session.id, "output": sc(session.intro),
+            "state": _pretty_state(session.state())}
 
 
 @app.get("/api/games/{session_id}/scene")
 def scene(session_id: str):
     session = _session(session_id)
     result = scenes.get(GAME_DATA, session.game.loc)
-    result["name"] = cavemap.cave_graph(GAME_DATA)[0].get(session.game.loc)
+    result["name"] = sc(cavemap.cave_graph(GAME_DATA)[0].get(session.game.loc))
     return result
 
 
@@ -115,15 +147,15 @@ def scene_at(location: int):
 @app.get("/api/games/{session_id}/map")
 def game_map(session_id: str, depth: int | None = None, direction: str = "LR"):
     session = _session(session_id)
-    return cavemap.map_payload(GAME_DATA, center=session.game.loc, depth=depth,
-                               direction=direction)
+    return _pretty_map(cavemap.map_payload(GAME_DATA, center=session.game.loc,
+                                           depth=depth, direction=direction))
 
 
 @app.get("/api/map")
 def full_map(from_location: int | None = None, depth: int | None = None,
              direction: str = "LR"):
-    return cavemap.map_payload(GAME_DATA, center=from_location, depth=depth,
-                               direction=direction)
+    return _pretty_map(cavemap.map_payload(GAME_DATA, center=from_location,
+                                           depth=depth, direction=direction))
 
 
 @app.post("/api/games/{session_id}/chat")
@@ -138,7 +170,8 @@ def chat(session_id: str, body: ChatMessage):
     history = chat_histories.get(session_id, [])
     reply, history = run_chat(session, history, body.message, scenes=scenes, data=GAME_DATA)
     chat_histories[session_id] = history
-    return {"reply": reply, "state": session.state()}
+    # The LLM reply is already normal prose; only prettify the engine state.
+    return {"reply": reply, "state": _pretty_state(session.state())}
 
 
 def main() -> int:
