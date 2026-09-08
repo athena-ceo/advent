@@ -30,7 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--steps", type=int, default=None)
     p.add_argument("--guidance", type=float, default=None)
     p.add_argument("--size", type=int, default=None)
-    p.add_argument("--only", type=int, default=None, help="generate a single location number")
+    p.add_argument("--only", default=None,
+                   help="comma-separated location number(s) to generate, e.g. 130,131,132")
     p.add_argument("--limit", type=int, default=None, help="generate at most N locations")
     p.add_argument("--overwrite", action="store_true", help="regenerate even if cached")
     p.add_argument("--dry-run", action="store_true", help="print prompts, don't generate")
@@ -39,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     data = load_default_data()
     locs = [0] + sorted(data.long_desc)  # 0 = the title card / cave mouth
     if args.only is not None:
-        locs = [args.only]
+        locs = [int(x) for x in str(args.only).split(",") if x.strip() != ""]
     if args.limit is not None:
         locs = locs[: args.limit]
 
