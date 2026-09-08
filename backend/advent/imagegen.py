@@ -118,3 +118,15 @@ class DiffusersGenerator:
         buf = BytesIO()
         image.save(buf, format="PNG")
         return buf.getvalue(), "image/png"
+
+    def render(self, prompt: str, negative: str | None = None) -> tuple[bytes, str]:
+        """Generate an image from a single prompt (used for object sprites)."""
+        self._ensure_pipe()
+        kwargs = {"prompt": prompt, "num_inference_steps": self.steps,
+                  "guidance_scale": self.guidance, "height": self.size, "width": self.size}
+        if self.guidance and self.guidance > 0 and negative:
+            kwargs["negative_prompt"] = negative
+        image = self._pipe(**kwargs).images[0]
+        buf = BytesIO()
+        image.save(buf, format="PNG")
+        return buf.getvalue(), "image/png"

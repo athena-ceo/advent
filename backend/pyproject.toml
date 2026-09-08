@@ -7,7 +7,8 @@ name = "advent"
 version = "0.1.0"
 description = "Faithful Python port of the original 350-point Colossal Cave Adventure (Crowther & Woods)"
 requires-python = ">=3.10"
-dependencies = []
+# Pillow is used by the scene compositor (web runtime). The pure engine has no deps.
+dependencies = ["pillow>=10"]
 
 [project.optional-dependencies]
 mcp = ["mcp>=2"]
@@ -19,6 +20,8 @@ imagegen = [
     "accelerate>=0.33",
     "safetensors>=0.4",
     "sentencepiece>=0.2",
+    "rembg>=2.0",
+    "onnxruntime>=1.17",
     "protobuf>=4",
 ]
 test = ["pytest>=7", "adventure>=1.4", "mcp>=2"]
@@ -27,6 +30,7 @@ test = ["pytest>=7", "adventure>=1.4", "mcp>=2"]
 advent = "advent.cli:main"
 advent-mcp = "advent.mcp_server:main"
 advent-pregen = "advent.pregen:main"
+advent-spritegen = "advent.spritegen:main"
 
 [tool.setuptools]
 packages = ["advent"]

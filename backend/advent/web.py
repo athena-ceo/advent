@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import cavemap
+from .compositor import SceneComposer
 from .data import load_default_data
 from .scene import SceneStore
 from .session import SessionManager
@@ -24,6 +25,7 @@ from .text import sentence_case as sc
 GAME_DATA = load_default_data()
 sessions = SessionManager()
 scenes = SceneStore()
+composer = SceneComposer(scenes, os.environ.get("ADVENT_SPRITE_CACHE", "./sprite-cache"))
 chat_histories: dict[str, list] = {}
 
 
@@ -134,7 +136,7 @@ def restore_game(body: Restore):
 @app.get("/api/games/{session_id}/scene")
 def scene(session_id: str):
     session = _session(session_id)
-    result = scenes.get(GAME_DATA, session.game.loc)
+    result = composer.render(GAME_DATA, session.game.loc, session.game.visible_objects())
     result["name"] = sc(cavemap.cave_graph(GAME_DATA)[0].get(session.game.loc))
     return result
 
