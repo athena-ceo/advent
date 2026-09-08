@@ -12,7 +12,7 @@ from __future__ import annotations
 from io import BytesIO
 
 from .data import GameData
-from .scene import scene_prompt, scene_style, scene_subject_text
+from .scene import DEFAULT_STYLE, scene_prompt, scene_style, scene_subject_text
 
 # Sensible steps/guidance/size per model. Turbo/schnell are few-step, low-CFG.
 MODEL_DEFAULTS: dict[str, dict] = {
@@ -57,13 +57,14 @@ class DiffusersGenerator:
 
     def __init__(self, model: str = "stabilityai/sdxl-turbo", *, steps: int | None = None,
                  guidance: float | None = None, size: int | None = None,
-                 device: str | None = None):
+                 device: str | None = None, style: str = DEFAULT_STYLE):
         d = MODEL_DEFAULTS.get(model, {"steps": 20, "guidance": 5.0, "size": 512})
         self.model = model
         self.steps = steps if steps is not None else d["steps"]
         self.guidance = guidance if guidance is not None else d["guidance"]
         self.size = size if size is not None else d["size"]
         self.device = device or pick_device()
+        self.style = style
         self._pipe = None
 
     def _ensure_pipe(self):
@@ -103,14 +104,14 @@ class DiffusersGenerator:
             # SDXL has two CLIP encoders (77 tokens each): scene -> encoder 1,
             # style -> encoder 2, so both apply in full without truncation.
             kwargs["prompt"] = scene_subject_text(data, loc)
-            kwargs["prompt_2"] = scene_style(data, loc)
+            kwargs["prompt_2"] = scene_style(data, loc, self.style)
             if use_negative:
                 kwargs["negative_prompt"] = NEGATIVE
                 kwargs["negative_prompt_2"] = NEGATIVE
         else:
             # T5-based models (FLUX, SD3, PixArt) take the full combined prompt;
             # single-CLIP models truncate it (not recommended for long scenes).
-            kwargs["prompt"] = scene_prompt(data, loc)
+            kwargs["prompt"] = scene_prompt(data, loc, self.style)
             if use_negative:
                 kwargs["negative_prompt"] = NEGATIVE
 

@@ -15,6 +15,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .data import GameData
+from .scene import DEFAULT_STYLE
+
+# The rendering medium per style, so sprites match their room library.
+_MEDIUM = {
+    "photoreal": "photorealistic, studio product photo",
+    "fantasy": "digital painting, painterly concept art",
+    "anime": "anime, cel shaded",
+    "cartoon": "stylized 3d cartoon, Pixar style",
+    "watercolor": "watercolor and ink",
+}
 
 # Creatures get drawn large and central; everything else is a smaller "item".
 _CREATURE_WORDS = ["SNAKE", "DRAGO", "BIRD", "DWARF", "TROLL", "BEAR"]
@@ -32,8 +42,8 @@ _ITEM_WORDS = [
 
 SPRITE_STYLE = (
     "isolated on a plain flat neutral-grey backdrop, the whole object centered "
-    "and fully in frame, soft even studio lighting, high fantasy, photorealistic, "
-    "highly detailed, sharp focus, no scenery, no background, no floor"
+    "and fully in frame, soft even studio lighting, high fantasy, highly detailed, "
+    "sharp focus, no scenery, no background, no floor"
 )
 
 
@@ -72,11 +82,12 @@ def has_sprite(data: GameData, obj: int) -> bool:
     return obj in _reverse(data)
 
 
-def sprite_prompt(data: GameData, obj: int) -> str:
-    """Prompt for generating one object's sprite."""
+def sprite_prompt(data: GameData, obj: int, style: str = DEFAULT_STYLE) -> str:
+    """Prompt for generating one object's sprite, in the given style."""
     name = data.object_name(obj).lower()
     kind = "a fearsome creature," if is_creature(data, obj) else "a single game object,"
-    return f"{name}, {kind} {SPRITE_STYLE}"
+    medium = _MEDIUM.get(style, _MEDIUM[DEFAULT_STYLE])
+    return f"{name}, {kind} {medium}, {SPRITE_STYLE}"
 
 
 def layout(data: GameData, present: list[int]) -> list[tuple[int, Placement]]:

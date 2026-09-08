@@ -34,18 +34,22 @@ def test_layout_creatures_bigger_than_items(data):
 
 
 def test_composite_and_cache(tmp_path, data):
-    scene_dir = tmp_path / "scenes"; scene_dir.mkdir()
-    sprite_dir = tmp_path / "sprites"; sprite_dir.mkdir()
-    (scene_dir / "loc_5.png").write_bytes(_png(640, 400, (20, 20, 20)))
+    scene_dir = tmp_path / "scenes"
+    sprite_dir = tmp_path / "sprites"
+    # Per-style subfolders (default style is "photoreal").
+    (scene_dir / "photoreal").mkdir(parents=True)
+    (sprite_dir / "photoreal").mkdir(parents=True)
+    (scene_dir / "photoreal" / "loc_5.png").write_bytes(_png(640, 400, (20, 20, 20)))
     keys = data.vocab("KEYS", 1)
-    sprite_dir.joinpath(f"obj_{keys}.png").write_bytes(_png(100, 100, (255, 0, 0, 255), "RGBA"))
+    (sprite_dir / "photoreal" / f"obj_{keys}.png").write_bytes(
+        _png(100, 100, (255, 0, 0, 255), "RGBA"))
 
     comp = SceneComposer(SceneStore(cache_dir=scene_dir), sprite_dir,
                          composite_dir=tmp_path / "composite")
     r = comp.render(data, 5, [keys])
     assert r.get("composited") and r["objects"] == [keys]
     assert r["mimetype"] == "image/png" and r["data_uri"].startswith("data:image/png")
-    assert list((tmp_path / "composite").glob("5_*.png"))  # cached
+    assert list(comp.composite_dir.glob("5_*.png"))  # cached (per-style subfolder)
 
     # No visible objects -> the base plate is returned untouched.
     assert not comp.render(data, 5, []).get("composited")

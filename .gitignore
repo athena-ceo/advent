@@ -11,8 +11,10 @@ savefile
 node_modules/
 frontend/dist/
 
-# Generated scene images (lazy image cache)
+# Generated image caches (lazy scene plates, object sprites, composites)
 scene-cache/
+sprite-cache/
+composite-cache/
 
 # Local secrets and caches
 .env

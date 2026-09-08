@@ -25,9 +25,13 @@ class SceneComposer:
     def __init__(self, scene_store: SceneStore, sprite_dir: str | Path,
                  composite_dir: str | Path | None = None):
         self.scenes = scene_store
-        self.sprite_dir = Path(sprite_dir)
-        self.composite_dir = Path(composite_dir
-                                  or self.scenes.cache_dir.parent / "composite-cache")
+        style = scene_store.style
+        # Sprites and composites live in per-style subfolders, matching the
+        # scene store, so each library stays self-consistent.
+        self.sprite_dir = Path(sprite_dir) / style
+        base_comp = Path(composite_dir) if composite_dir else \
+            self.scenes.cache_dir.parent.parent / "composite-cache"
+        self.composite_dir = base_comp / style
         self.composite_dir.mkdir(parents=True, exist_ok=True)
 
     def _sprite_path(self, obj: int) -> Path:

@@ -19,6 +19,7 @@ from io import BytesIO
 from pathlib import Path
 
 from .data import load_default_data
+from .scene import DEFAULT_STYLE, STYLES, resolve_style
 from .sprites import sprite_objects, sprite_prompt
 
 SPRITE_NEGATIVE = "scene, background, floor, ground, room, landscape, text, watermark, multiple objects"
@@ -39,7 +40,9 @@ def _cutout(png_bytes: bytes) -> bytes:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Generate object/creature sprites.")
     p.add_argument("--model", default="PixArt-alpha/PixArt-Sigma-XL-2-1024-MS")
-    p.add_argument("--out", default="./sprite-cache")
+    p.add_argument("--out", default="./sprite-cache", help="base sprite cache directory")
+    p.add_argument("--style", default=DEFAULT_STYLE,
+                   help=f"style library (default: {DEFAULT_STYLE}); one of {', '.join(STYLES)}")
     p.add_argument("--steps", type=int, default=None)
     p.add_argument("--guidance", type=float, default=None)
     p.add_argument("--size", type=int, default=None)
@@ -48,26 +51,27 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--dry-run", action="store_true", help="print prompts, don't generate")
     args = p.parse_args(argv)
 
+    style = resolve_style(args.style)
     data = load_default_data()
     objs = sprite_objects(data)
     if args.only is not None:
         wanted = {int(x) for x in str(args.only).split(",") if x.strip()}
         objs = [o for o in objs if o in wanted]
 
-    out = Path(args.out)
+    out = Path(args.out) / style          # one sprite folder per style
     out.mkdir(parents=True, exist_ok=True)
 
     if args.dry_run:
         for obj in objs:
-            print(f"[obj {obj:3}] {data.object_name(obj)} :: {sprite_prompt(data, obj)[:90]}")
-        print(f"\n{len(objs)} sprites. (dry run -- nothing written)")
+            print(f"[obj {obj:3}] {data.object_name(obj)} :: {sprite_prompt(data, obj, style)[:90]}")
+        print(f"\n{len(objs)} sprites, style={style}. (dry run -- nothing written)")
         return 0
 
     from .imagegen import DiffusersGenerator
 
     gen = DiffusersGenerator(args.model, steps=args.steps, guidance=args.guidance,
-                             size=args.size)
-    print(f"model={args.model} device={gen.device} steps={gen.steps} "
+                             size=args.size, style=style)
+    print(f"model={args.model} style={style} device={gen.device} steps={gen.steps} "
           f"guidance={gen.guidance} size={gen.size} sprites={len(objs)}")
 
     made = skipped = 0
@@ -76,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         if dest.exists() and not args.overwrite:
             skipped += 1
             continue
-        raw, _ = gen.render(sprite_prompt(data, obj), negative=SPRITE_NEGATIVE)
+        raw, _ = gen.render(sprite_prompt(data, obj, style), negative=SPRITE_NEGATIVE)
         dest.write_bytes(_cutout(raw))
         made += 1
         print(f"  [{i}/{len(objs)}] obj {obj} ({data.object_name(obj)}) -> {dest.name}",

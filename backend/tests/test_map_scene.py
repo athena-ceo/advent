@@ -66,8 +66,9 @@ def test_scene_prompt_and_store(tmp_path, data):
     assert first["mimetype"] == "image/svg+xml"
     assert scene_style(data, 3) in first["prompt"]
 
-    # A cached file now exists and is served without regenerating.
-    assert (tmp_path / "loc_3.svg").exists()
+    # A cached file now exists (in the per-style subfolder) and is served again.
+    assert (store.cache_dir / "loc_3.svg").exists()
+    assert store.cache_dir.name == "photoreal"
     second = store.get(data, 3)
     assert second["cached"] is True
     assert second["image_base64"] == first["image_base64"]
@@ -80,7 +81,7 @@ def test_pluggable_generator(tmp_path, data):
     store = SceneStore(cache_dir=tmp_path, generator=fake_png)
     result = store.get(data, 5)
     assert result["mimetype"] == "image/png"
-    assert (tmp_path / "loc_5.png").exists()
+    assert (store.cache_dir / "loc_5.png").exists()
 
 
 def test_map_and_scene_mcp_tools():

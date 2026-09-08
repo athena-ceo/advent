@@ -27,23 +27,69 @@ from .data import GameData
 # These are *modifiers* -- medium, setting, lighting, mood -- NOT scene content.
 # The scene text decides what is actually in the picture (a small brick building
 # vs. a vast hall); the style must not name architecture or it hijacks the image.
-STYLE_UNDERGROUND = (
-    "photorealistic, high fantasy, deep underground, lit only by warm torchlight "
-    "against near-total darkness, bare rock, damp stone, cool shadows, "
-    "atmospheric haze, cinematic, dramatic, hyper-detailed, 8k, deserted"
-)
-STYLE_SURFACE = (
-    "photorealistic, high fantasy, outdoors in daylight, lush green forest, "
-    "soft natural light, gentle mist, atmospheric, cinematic, hyper-detailed, "
-    "8k, deserted"
-)
-# Title card for location 0 -- dramatic, no forced forest.
-STYLE_TITLE = (
-    "photorealistic, epic high fantasy, dramatic cinematic key art, moody dusk "
-    "light, mist and atmosphere, rugged rock, hyper-detailed, 8k, deserted"
-)
-# Back-compat alias (default look).
+# A style is three look-modifier strings (surface / underground / title). Each
+# room picks one by whether it's lit (surface) or deep cave (underground); the
+# scene text supplies the content, so styles must NOT name architecture. Keep
+# each under ~77 tokens (SDXL's per-encoder budget).
+STYLES: dict[str, dict[str, str]] = {
+    "photoreal": {
+        "surface": ("photorealistic, high fantasy, outdoors in daylight, lush green "
+                    "forest, soft natural light, gentle mist, atmospheric, cinematic, "
+                    "hyper-detailed, 8k, deserted"),
+        "underground": ("photorealistic, high fantasy, deep underground, lit only by "
+                        "warm torchlight against near-total darkness, bare rock, damp "
+                        "stone, cool shadows, atmospheric haze, cinematic, dramatic, "
+                        "hyper-detailed, 8k, deserted"),
+        "title": ("photorealistic, epic high fantasy, dramatic cinematic key art, "
+                  "moody dusk light, mist and atmosphere, rugged rock, hyper-detailed, "
+                  "8k, deserted"),
+    },
+    "fantasy": {
+        "surface": ("digital painting, high fantasy concept art, painterly, luminous "
+                    "daylight forest, soft mist, lush, storybook, richly detailed, "
+                    "trending on artstation, deserted"),
+        "underground": ("digital painting, high fantasy concept art, painterly, vast "
+                        "torchlit cavern, deep shadows, glowing embers, dramatic, "
+                        "atmospheric, trending on artstation, deserted"),
+        "title": ("epic high fantasy concept art, painterly key art, dramatic dusk, "
+                  "mist, sweeping vista, trending on artstation, deserted"),
+    },
+    "anime": {
+        "surface": ("anime background art, Studio Ghibli inspired, hand-painted, bright "
+                    "daylight forest, soft mist, lush, cel shaded, detailed, deserted"),
+        "underground": ("anime background art, Studio Ghibli inspired, hand-painted, "
+                        "torchlit cavern, dramatic shadows, glowing light, cel shaded, "
+                        "detailed, deserted"),
+        "title": ("anime key visual, epic dusk vista, hand-painted, cinematic, deserted"),
+    },
+    "cartoon": {
+        "surface": ("stylized 3d cartoon render, Pixar style, vibrant daylight forest, "
+                    "soft shadows, playful, clean shapes, deserted"),
+        "underground": ("stylized 3d cartoon render, Pixar style, torchlit cavern, warm "
+                        "glow, cozy dramatic lighting, clean shapes, deserted"),
+        "title": ("stylized 3d cartoon key art, adventurous dusk vista, playful, deserted"),
+    },
+    "watercolor": {
+        "surface": ("delicate watercolor painting, soft washes, loose ink linework, "
+                    "daylight forest, airy, muted palette, deserted"),
+        "underground": ("delicate watercolor painting, soft washes, ink linework, "
+                        "torchlit cavern, moody, muted palette, deserted"),
+        "title": ("watercolor and ink key art, misty dusk vista, loose linework, deserted"),
+    },
+}
+
+DEFAULT_STYLE = "photoreal"
+
+# Back-compat aliases (the default look's modifiers).
+STYLE_SURFACE = STYLES[DEFAULT_STYLE]["surface"]
+STYLE_UNDERGROUND = STYLES[DEFAULT_STYLE]["underground"]
+STYLE_TITLE = STYLES[DEFAULT_STYLE]["title"]
 STYLE_GUIDE = STYLE_UNDERGROUND
+
+
+def resolve_style(style: str | None) -> str:
+    """Normalise a requested style name to a known one (fallback to default)."""
+    return style if style in STYLES else DEFAULT_STYLE
 
 # Second-person openings the game uses, stripped so the prompt reads as a scene.
 # Each token requires a trailing space so e.g. "in" won't eat the "in" of "inside".
@@ -84,23 +130,26 @@ def scene_subject_text(data: GameData, loc: int) -> str:
     return _scene_subject(text)
 
 
-def scene_style(data: GameData, loc: int) -> str:
-    """Surface style for naturally-lit outdoor rooms, cavern style otherwise.
+def scene_style(data: GameData, loc: int, style: str = DEFAULT_STYLE) -> str:
+    """Look modifiers for a room in the given style.
 
-    The game sets the LIGHT condition bit (bit 0) on rooms that don't need the
-    lamp -- i.e. the surface and a few open rooms; everything else is deep cave.
+    Surface (daylit) variant for naturally-lit rooms, cavern variant otherwise;
+    location 0 uses the title variant. The game sets the LIGHT condition bit
+    (bit 0) on rooms that don't need the lamp -- the surface and a few open
+    rooms; everything else is deep cave.
     """
+    variants = STYLES[resolve_style(style)]
     if loc == 0:
-        return STYLE_TITLE
+        return variants["title"]
     lit = bool(data.cond.get(loc, 0) & 1)
-    return STYLE_SURFACE if lit else STYLE_UNDERGROUND
+    return variants["surface"] if lit else variants["underground"]
 
 
-def scene_prompt(data: GameData, loc: int) -> str:
+def scene_prompt(data: GameData, loc: int, style: str = DEFAULT_STYLE) -> str:
     """The combined prompt (scene then style) for display and single-encoder /
     T5 models. On SDXL the generator instead sends the scene and style to the
     two separate encoders (see ``imagegen``)."""
-    return f"{scene_subject_text(data, loc)} — {scene_style(data, loc)}"
+    return f"{scene_subject_text(data, loc)} — {scene_style(data, loc, style)}"
 
 
 def _wrap(text: str, width: int) -> list[str]:
@@ -168,9 +217,12 @@ def _xml(text: str) -> str:
 class SceneStore:
     """Generate-on-first-request, cache-forever store of location images."""
 
-    def __init__(self, cache_dir: str | Path | None = None, generator=None):
-        self.cache_dir = Path(cache_dir or os.environ.get(
+    def __init__(self, cache_dir: str | Path | None = None, generator=None,
+                 style: str = DEFAULT_STYLE):
+        base = Path(cache_dir or os.environ.get(
             "ADVENT_SCENE_CACHE", Path.cwd() / "scene-cache"))
+        self.style = resolve_style(style)
+        self.cache_dir = base / self.style       # one folder of images per style
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.generator = generator or placeholder_svg
 
@@ -200,9 +252,10 @@ class SceneStore:
         b64 = base64.b64encode(content).decode("ascii")
         return {
             "location": loc,
+            "style": self.style,
             "mimetype": mimetype,
             "cached": cached,
-            "prompt": scene_prompt(data, loc),
+            "prompt": scene_prompt(data, loc, self.style),
             "image_base64": b64,
             "data_uri": f"data:{mimetype};base64,{b64}",
         }

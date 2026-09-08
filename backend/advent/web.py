@@ -18,15 +18,26 @@ from pydantic import BaseModel
 from . import cavemap
 from .compositor import SceneComposer
 from .data import load_default_data
-from .scene import SceneStore
+from .scene import STYLES, resolve_style, SceneStore
 from .session import SessionManager
 from .text import sentence_case as sc
 
 GAME_DATA = load_default_data()
 sessions = SessionManager()
-scenes = SceneStore()
-composer = SceneComposer(scenes, os.environ.get("ADVENT_SPRITE_CACHE", "./sprite-cache"))
 chat_histories: dict[str, list] = {}
+
+_SPRITE_DIR = os.environ.get("ADVENT_SPRITE_CACHE", "./sprite-cache")
+_composers: dict[str, SceneComposer] = {}
+
+
+def get_composer(style: str | None) -> SceneComposer:
+    """A cached SceneComposer for a style (its own scene/sprite/composite dirs)."""
+    style = resolve_style(style)
+    comp = _composers.get(style)
+    if comp is None:
+        comp = SceneComposer(SceneStore(style=style), _SPRITE_DIR)
+        _composers[style] = comp
+    return comp
 
 
 def _pretty_state(st: dict) -> dict:
@@ -133,17 +144,23 @@ def restore_game(body: Restore):
             "state": _pretty_state(session.state())}
 
 
+@app.get("/api/styles")
+def styles():
+    return {"styles": list(STYLES), "default": resolve_style(None)}
+
+
 @app.get("/api/games/{session_id}/scene")
-def scene(session_id: str):
+def scene(session_id: str, style: str | None = None):
     session = _session(session_id)
-    result = composer.render(GAME_DATA, session.game.loc, session.game.visible_objects())
+    result = get_composer(style).render(GAME_DATA, session.game.loc,
+                                        session.game.visible_objects())
     result["name"] = sc(cavemap.cave_graph(GAME_DATA)[0].get(session.game.loc))
     return result
 
 
 @app.get("/api/scene/{location}")
-def scene_at(location: int):
-    return scenes.get(GAME_DATA, location)
+def scene_at(location: int, style: str | None = None):
+    return get_composer(style).scenes.get(GAME_DATA, location)
 
 
 @app.get("/api/games/{session_id}/map")
