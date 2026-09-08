@@ -19,6 +19,11 @@ from pathlib import Path
 
 from .data import GameData
 
+try:  # hand-authored enriched per-room descriptions (optional; see descriptions.py)
+    from .descriptions import SCENE_DETAIL
+except Exception:  # pragma: no cover - fall back to the raw room text
+    SCENE_DETAIL: dict[int, str] = {}
+
 # Photorealistic high fantasy. Most of the game is deep underground, so the
 # default look is a vast Moria/Erebor cavern; the handful of surface rooms (which
 # the game marks as naturally lit) get an outdoor variant instead. On SDXL each
@@ -203,9 +208,17 @@ _TITLE_SCENE = ("the mouth of a vast colossal cave, a mysterious dark opening in
 
 
 def scene_subject_text(data: GameData, loc: int) -> str:
-    """Just the scene (no style), cleaned from the room's description."""
+    """Just the scene (no style), cleaned from the room's description.
+
+    Prefers a hand-authored *enriched* description from ``advent.descriptions``
+    when one exists (richer, more visual, still faithful to the original) and
+    otherwise falls back to the room's own text, cleaned into a scene phrase.
+    """
     if loc == 0:
         return _TITLE_SCENE
+    enriched = SCENE_DETAIL.get(loc)
+    if enriched:
+        return " ".join(enriched.split())   # already a clean third-person scene
     text = data.long_desc.get(loc, "")
     if not text or text.startswith(">$<"):
         text = data.short_desc.get(loc) or "a mysterious chamber deep in a colossal cave"
