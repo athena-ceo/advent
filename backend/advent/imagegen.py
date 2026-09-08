@@ -20,6 +20,7 @@ MODEL_DEFAULTS: dict[str, dict] = {
     "stabilityai/sd-turbo": {"steps": 4, "guidance": 0.0, "size": 512},
     "stabilityai/stable-diffusion-xl-base-1.0": {"steps": 30, "guidance": 7.0, "size": 768},
     "black-forest-labs/FLUX.1-schnell": {"steps": 4, "guidance": 0.0, "size": 768},
+    "PixArt-alpha/PixArt-Sigma-XL-2-1024-MS": {"steps": 18, "guidance": 4.5, "size": 768},
     "runwayml/stable-diffusion-v1-5": {"steps": 28, "guidance": 7.5, "size": 512},
 }
 
@@ -78,7 +79,14 @@ class DiffusersGenerator:
             dtype = torch.bfloat16          # FLUX is numerically happiest in bf16
         else:
             dtype = torch.float16
-        pipe = AutoPipelineForText2Image.from_pretrained(self.model, torch_dtype=dtype)
+        try:
+            pipe = AutoPipelineForText2Image.from_pretrained(self.model, torch_dtype=dtype)
+        except Exception:
+            if "pixart" in self.model.lower():
+                from diffusers import PixArtSigmaPipeline
+                pipe = PixArtSigmaPipeline.from_pretrained(self.model, torch_dtype=dtype)
+            else:
+                raise
         pipe = pipe.to(self.device)
         pipe.set_progress_bar_config(disable=True)
         self._pipe = pipe
