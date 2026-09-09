@@ -61,7 +61,8 @@ case "$CMD" in
     for dir in scene-cache sprite-cache; do
       if [ -d "$dir" ]; then
         echo "==> rsync $dir -> ${ADVENT_DEPLOY_SSH}:${ADVENT_DEPLOY_DIR}/$dir"
-        rsync -a --info=progress2 --delete "$dir/" \
+        # Portable flags: macOS ships openrsync (no --info=progress2).
+        rsync -rlptv --delete "$dir/" \
           "${ADVENT_DEPLOY_SSH}:${ADVENT_DEPLOY_DIR}/$dir/"
       fi
     done

@@ -250,7 +250,7 @@ export default function App() {
         </div>
 
         <aside className="flex-1 flex flex-col gap-3 min-h-0 min-w-0">
-          <ScenePanel scene={scene} loading={sceneLoading} />
+          <ScenePanel scene={scene} loading={sceneLoading} dark={state?.dark} />
           <div className="shrink-0 flex flex-col gap-3 overflow-y-auto scroll-thin max-h-[55%]">
             <StatusBar state={state} onAction={send} />
             {showMap && (

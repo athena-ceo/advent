@@ -18,6 +18,7 @@ import time
 import uuid
 
 from .game import Game
+from .text import sentence_case as _sc
 
 # Sentinels placed on the output queue by the engine thread.
 _NEED_INPUT = object()  # engine is now blocked waiting for the next line
@@ -81,7 +82,10 @@ class Session:
                 self.ended = True
                 break
             chunks.append(item)
-        return "\n\n".join(chunks)
+        # The engine is faithfully ALL-CAPS (matching the original); present it
+        # in normal case here, at the single boundary every interactive surface
+        # (web classic + guided chat + MCP) shares.
+        return _sc("\n\n".join(chunks))
 
     # -- public API ---------------------------------------------------------
 
@@ -104,6 +108,12 @@ class Session:
         if self.ended:
             score, mxscor = self.game.compute_score()
             st["score"], st["max_score"] = score, mxscor
+        # Present engine text in normal case (names/description); leave the
+        # lower-case motion words and object `word`s (used to build commands).
+        st["name"] = _sc(st.get("name", ""))
+        st["description"] = _sc(st.get("description", ""))
+        for key in ("visible_objects", "inventory"):
+            st[key] = [{**o, "name": _sc(o["name"])} for o in st.get(key, [])]
         return st
 
     def transcript(self) -> list[str]:

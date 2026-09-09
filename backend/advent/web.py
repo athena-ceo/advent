@@ -42,21 +42,15 @@ def get_composer(style: str | None) -> SceneComposer:
     return comp
 
 
+# Engine text (output + state) is already sentence-cased at the session boundary
+# (see advent.session), so the play endpoints pass it straight through. Only the
+# cave map still needs casing here, as its labels come from cavemap, not a session.
 def _pretty_state(st: dict) -> dict:
-    """Sentence-case the engine text in a state dict for display (copy)."""
-    st = dict(st)
-    st["name"] = sc(st.get("name", ""))
-    st["description"] = sc(st.get("description", ""))
-    st["visible_objects"] = [{"name": sc(o["name"]), "word": o["word"]}
-                             for o in st.get("visible_objects", [])]
-    st["inventory"] = [{"name": sc(o["name"]), "word": o["word"]}
-                       for o in st.get("inventory", [])]
-    return st  # exits are motion words, already lower-case
+    return st
 
 
 def _pretty_turn(r: dict) -> dict:
-    return {"output": sc(r["output"]), "ended": r["ended"],
-            "state": _pretty_state(r["state"])}
+    return r
 
 
 def _pretty_map(payload: dict) -> dict:
