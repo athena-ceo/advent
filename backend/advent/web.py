@@ -193,7 +193,8 @@ def chat(session_id: str, body: ChatMessage):
     from .chat import run_chat
 
     history = chat_histories.get(session_id, [])
-    reply, history = run_chat(session, history, body.message, scenes=scenes, data=GAME_DATA)
+    reply, history = run_chat(session, history, body.message,
+                              scenes=get_composer(None).scenes, data=GAME_DATA)
     chat_histories[session_id] = history
     # The LLM reply is already normal prose; only prettify the engine state.
     return {"reply": reply, "state": _pretty_state(session.state())}

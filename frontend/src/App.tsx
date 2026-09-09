@@ -234,7 +234,7 @@ export default function App() {
       <main ref={mainRef} className="flex-1 flex flex-col lg:flex-row gap-3 p-4 overflow-hidden">
         <section style={{ flexBasis: `${leftFrac * 100}%` }}
           className="flex flex-col rounded-lg border border-cave-600 bg-cave-800 overflow-hidden min-h-0 lg:min-w-0">
-          <Transcript lines={lines} />
+          <Transcript lines={lines} busy={busy} />
           <CommandBar
             onSend={send}
             disabled={busy || !sid}
