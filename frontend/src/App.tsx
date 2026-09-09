@@ -7,6 +7,7 @@ import { MapPanel } from "./components/MapPanel";
 import { StatusBar } from "./components/StatusBar";
 import { Transcript, type Line } from "./components/Transcript";
 import { CommandBar } from "./components/CommandBar";
+import { InfoModal, type InfoKind } from "./components/InfoModal";
 
 type Mode = "classic" | "guided";
 
@@ -36,6 +37,7 @@ export default function App() {
   const [showMap, setShowMap] = useState(() => localStorage.getItem(MAP_KEY) === "1");
   const [styles, setStyles] = useState<string[]>([]);
   const [style, setStyle] = useState<string>(() => localStorage.getItem(STYLE_KEY) ?? "");
+  const [info, setInfo] = useState<InfoKind | null>(null);
   const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { localStorage.setItem(LEFT_KEY, String(leftFrac)); }, [leftFrac]);
@@ -201,7 +203,11 @@ export default function App() {
       <header className="flex items-center justify-between px-4 py-3 border-b border-cave-600 bg-cave-800">
         <div className="flex items-baseline gap-3">
           <h1 className="font-serif text-lg text-amber-glow">Colossal Cave</h1>
-          <span className="text-xs text-cave-600">Adventure · 350 points</span>
+          <span className="text-xs text-cave-300">Adventure · 350 points</span>
+          <button onClick={() => setInfo("help")}
+            className="text-xs px-2 py-0.5 rounded border border-cave-600 bg-cave-700 hover:border-amber-glow/60">Help</button>
+          <button onClick={() => setInfo("about")}
+            className="text-xs px-2 py-0.5 rounded border border-cave-600 bg-cave-700 hover:border-amber-glow/60">About</button>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <div className="flex rounded overflow-hidden border border-cave-600">
@@ -250,7 +256,8 @@ export default function App() {
         </div>
 
         <aside className="flex-1 flex flex-col gap-3 min-h-0 min-w-0">
-          <ScenePanel scene={scene} loading={sceneLoading} dark={state?.dark} />
+          <ScenePanel scene={scene} loading={sceneLoading}
+            dark={!!state?.dark && (state?.location ?? 0) > 0} />
           <div className="shrink-0 flex flex-col gap-3 overflow-y-auto scroll-thin max-h-[55%]">
             <StatusBar state={state} onAction={send} />
             {showMap && (
@@ -262,6 +269,8 @@ export default function App() {
           </div>
         </aside>
       </main>
+
+      {info && <InfoModal kind={info} onClose={() => setInfo(null)} />}
     </div>
   );
 }
