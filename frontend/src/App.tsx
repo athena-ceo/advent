@@ -253,6 +253,9 @@ export default function App() {
           <button onClick={restore} disabled={!saveId || busy} className={btn}>Restore</button>
           <button onClick={newGame} disabled={busy} className={btn}>New</button>
           <span className="w-px h-5 bg-cave-600 mx-1" />
+          {user?.is_admin && (
+            <button onClick={() => setAdminOpen(true)} className={btn}>Admin</button>
+          )}
           {user?.registered ? (
             <div className="flex items-center gap-1">
               <span className="text-amber-glow font-semibold px-1" title="signed in">{user.name}</span>
@@ -303,7 +306,7 @@ export default function App() {
         <LeaderboardModal onClose={() => setBoardOpen(false)}
           onAdmin={() => { setBoardOpen(false); setAdminOpen(true); }} />
       )}
-      {adminOpen && <AdminModal onClose={() => setAdminOpen(false)} />}
+      {adminOpen && <AdminModal onClose={() => setAdminOpen(false)} isAdmin={!!user?.is_admin} />}
     </div>
   );
 }

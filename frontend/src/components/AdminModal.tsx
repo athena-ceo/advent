@@ -1,11 +1,11 @@
 // Copyright (c) 2026 Athena Decisions Systems SAS.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type AdminGame, type AdminUser } from "../api";
 import { Modal, field, plainBtn, primaryBtn } from "./Modal";
 
 const when = (t: number) => new Date(t * 1000).toLocaleString();
 
-export function AdminModal({ onClose }: { onClose: () => void }) {
+export function AdminModal({ onClose, isAdmin }: { onClose: () => void; isAdmin?: boolean }) {
   const [pw, setPw] = useState("");
   const [authed, setAuthed] = useState(false);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -23,6 +23,9 @@ export function AdminModal({ onClose }: { onClose: () => void }) {
     } finally { setBusy(false); }
   };
 
+  // Signed-in admins authenticate by their token -- load straight away.
+  useEffect(() => { if (isAdmin) load(""); }, [isAdmin]);
+
   const reset = async () => {
     if (!confirm("Wipe ALL games and reset the leaderboard? This cannot be undone.")) return;
     const r = await api.adminReset(pw).catch((e) => { setErr(String(e.message || e)); return null; });
@@ -36,7 +39,9 @@ export function AdminModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="Admin" onClose={onClose} wide>
-      {!authed ? (
+      {!authed && isAdmin ? (
+        <p className="text-cave-300">{err ? <span className="text-red-400">{err}</span> : "Loading…"}</p>
+      ) : !authed ? (
         <form onSubmit={(e) => { e.preventDefault(); load(pw); }} className="space-y-3">
           <p className="text-cave-300">Enter the admin password (set as <code>ADVENT_ADMIN_PASSWORD</code> on the server).</p>
           <input className={field} type="password" placeholder="admin password" value={pw} autoFocus

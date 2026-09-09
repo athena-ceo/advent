@@ -117,12 +117,17 @@ def _pid(token: str | None, guest: str | None) -> str:
     return gid
 
 
-def _admin(x_admin: str | None):
+def _admin(x_admin: str | None, x_token: str | None = None):
+    """Admin access: a signed-in admin account (token), or the optional server
+    password (X-Advent-Admin == ADVENT_ADMIN_PASSWORD) as a fallback."""
+    user = store.user_for_token(x_token) if x_token else None
+    if user and user.get("is_admin"):
+        return
     secret = os.environ.get("ADVENT_ADMIN_PASSWORD")
-    if not secret:
-        raise HTTPException(status_code=503, detail="admin is not configured on this server")
-    if x_admin != secret:
-        raise HTTPException(status_code=403, detail="bad admin password")
+    if secret and x_admin == secret:
+        return
+    raise HTTPException(status_code=403,
+                        detail="admin access required (sign in as an admin account)")
 
 
 def _session(session_id: str, player_id: str | None = None):
@@ -238,26 +243,30 @@ def metrics():
 # -- admin (gated by the ADVENT_ADMIN_PASSWORD env, sent as X-Advent-Admin) ---
 
 @app.get("/api/admin/users")
-def admin_users(x_advent_admin: str | None = Header(None)):
-    _admin(x_advent_admin)
+def admin_users(x_advent_admin: str | None = Header(None),
+                x_advent_token: str | None = Header(None)):
+    _admin(x_advent_admin, x_advent_token)
     return {"users": store.list_users()}
 
 
 @app.get("/api/admin/games")
-def admin_games(x_advent_admin: str | None = Header(None)):
-    _admin(x_advent_admin)
+def admin_games(x_advent_admin: str | None = Header(None),
+                x_advent_token: str | None = Header(None)):
+    _admin(x_advent_admin, x_advent_token)
     return {"games": store.recent_games()}
 
 
 @app.post("/api/admin/reset-leaderboard")
-def admin_reset(x_advent_admin: str | None = Header(None)):
-    _admin(x_advent_admin)
+def admin_reset(x_advent_admin: str | None = Header(None),
+                x_advent_token: str | None = Header(None)):
+    _admin(x_advent_admin, x_advent_token)
     return {"removed": store.reset_leaderboard()}
 
 
 @app.post("/api/admin/delete-user")
-def admin_delete_user(body: DeleteUser, x_advent_admin: str | None = Header(None)):
-    _admin(x_advent_admin)
+def admin_delete_user(body: DeleteUser, x_advent_admin: str | None = Header(None),
+                      x_advent_token: str | None = Header(None)):
+    _admin(x_advent_admin, x_advent_token)
     store.delete_user(body.player_id)
     return {"ok": True}
 
