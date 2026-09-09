@@ -29,7 +29,8 @@ def test_direct_play_flow(client):
     assert any(o["name"].lower() == "brass lantern" for o in r["state"]["inventory"])
 
     assert client.get(f"/api/games/{sid}/state").json()["location"] == 3
-    assert client.get(f"/api/games/{sid}/transcript").json()["transcript"]
+    log = client.get(f"/api/games/{sid}/transcript").json()["log"]
+    assert log and any(e["kind"] == "you" and e["text"] == "take lamp" for e in log)
 
     scene = client.get(f"/api/games/{sid}/scene").json()
     assert scene["location"] == 3 and scene["data_uri"].startswith("data:")

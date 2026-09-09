@@ -14,7 +14,7 @@ export function ScenePanel({ scene, loading }: { scene?: Scene; loading: boolean
       <div className="shrink-0 px-3 py-2 flex items-center justify-between text-xs border-t border-cave-600">
         <span className="font-serif text-amber-glow/90 truncate">{scene?.name ?? ""}</span>
         {scene && (
-          <span className="text-cave-600" title={scene.prompt}>
+          <span className="text-cave-300" title={scene.prompt}>
             {scene.cached ? "cached" : "generated"} · #{scene.location}
           </span>
         )}

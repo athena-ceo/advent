@@ -18,9 +18,15 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ADVENT_LLM_MODEL: ${ADVENT_LLM_MODEL:-claude-opus-5}
       ADVENT_SCENE_CACHE: /data/scene-cache
+      ADVENT_SPRITE_CACHE: /data/sprite-cache
+      ADVENT_COMPOSITE_CACHE: /data/composite-cache
     volumes:
-      # Persist the lazy scene-image cache across restarts.
+      # Persist the image caches across restarts. scene-cache and sprite-cache
+      # are pre-generated on a GPU/MPS box and rsynced up (see ./advent.sh sync);
+      # composite-cache is derived on the server and can start empty.
       - ${ADVENT_SCENE_CACHE_HOST:-./scene-cache}:/data/scene-cache
+      - ${ADVENT_SPRITE_CACHE_HOST:-./sprite-cache}:/data/sprite-cache
+      - ${ADVENT_COMPOSITE_CACHE_HOST:-./composite-cache}:/data/composite-cache
     networks:
       - advent-network
     healthcheck:

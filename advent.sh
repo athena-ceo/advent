@@ -46,6 +46,23 @@ case "$CMD" in
     SMOKE_BASE_URL="http://localhost:${BACKEND_PORT}" python3 scripts/smoke_test.py ;;
   test)
     ( cd backend && python -m pytest tests -q ) ;;
+  sync)
+    # Push the pre-generated image banks (built on a GPU/MPS box) to the prod
+    # host, where docker-compose.server.yml mounts them into the backend.
+    # Needs ADVENT_DEPLOY_SSH (user@host) and ADVENT_DEPLOY_DIR (the repo dir on
+    # the server) in .env. Composites are NOT synced -- the server rebuilds them
+    # lazily from the scene + sprite plates.
+    : "${ADVENT_DEPLOY_SSH:?set ADVENT_DEPLOY_SSH=user@host in .env}"
+    : "${ADVENT_DEPLOY_DIR:?set ADVENT_DEPLOY_DIR=/path/to/advent on the server in .env}"
+    for dir in scene-cache sprite-cache; do
+      if [ -d "$dir" ]; then
+        echo "==> rsync $dir -> ${ADVENT_DEPLOY_SSH}:${ADVENT_DEPLOY_DIR}/$dir"
+        rsync -az --info=progress2 --delete "$dir/" \
+          "${ADVENT_DEPLOY_SSH}:${ADVENT_DEPLOY_DIR}/$dir/"
+      fi
+    done
+    echo "done. (restart prod to pick up new mounts if this is the first sync:"
+    echo "  ssh ${ADVENT_DEPLOY_SSH} 'cd ${ADVENT_DEPLOY_DIR} && ./advent.sh restart prod')" ;;
   deploy)
     if [ "$ENVIRON" != "prod" ]; then echo "deploy requires prod"; exit 1; fi
     echo "==> git pull"; git pull --ff-only
@@ -59,5 +76,5 @@ case "$CMD" in
     done
     echo "health check failed"; $COMPOSE logs --tail 50 backend; exit 1 ;;
   *)
-    echo "usage: ./advent.sh {start|stop|restart|build|logs|ps|urls|health|smoke|test|deploy} [dev|prod]" ;;
+    echo "usage: ./advent.sh {start|stop|restart|build|logs|ps|urls|health|smoke|test|sync|deploy} [dev|prod]" ;;
 esac

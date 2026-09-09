@@ -1,0 +1,15 @@
+<!-- Copyright (c) 2026 Athena Decisions Systems SAS. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="48%" r="62%">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="0.5" stop-color="#c8791f"/>
+      <stop offset="1" stop-color="#120d08"/>
+    </radialGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#0f0d0a"/>
+  <!-- torch-lit cave mouth: amber glow behind a dark stone arch -->
+  <path d="M6 28 V15 a10 10 0 0 1 20 0 V28 Z" fill="url(#glow)"/>
+  <path d="M11 28 V16 a5 5 0 0 1 10 0 V28 Z" fill="#0b0906"/>
+  <ellipse cx="16" cy="24" rx="9" ry="4" fill="#ffcf7a" opacity="0.35"/>
+</svg>

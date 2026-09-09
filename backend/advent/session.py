@@ -45,6 +45,11 @@ class Session:
         # For a fresh game this is the welcome banner + "instructions?" prompt;
         # for a restored game it is the re-described current room.
         self.intro = self._pump(None)
+        # An interleaved play log (commands + their output) so a reload can
+        # rebuild the whole conversation, not just the game's replies.
+        self._log: list[dict] = []
+        if self.intro:
+            self._log.append({"kind": "game", "text": self.intro})
 
     # -- engine thread ------------------------------------------------------
 
@@ -87,6 +92,9 @@ class Session:
             if self.ended:
                 return {"output": "", "ended": True, "state": self.state()}
             output = self._pump(text)
+            self._log.append({"kind": "you", "text": text})
+            if output:
+                self._log.append({"kind": "game", "text": output})
             return {"output": output, "ended": self.ended, "state": self.state()}
 
     def state(self) -> dict:
@@ -100,6 +108,10 @@ class Session:
 
     def transcript(self) -> list[str]:
         return list(self.game.transcript)
+
+    def log(self) -> list[dict]:
+        """Interleaved play log: [{kind: 'you'|'game', text}], for UI resume."""
+        return list(self._log)
 
     def close(self) -> None:
         """Unblock and retire the session's engine thread."""

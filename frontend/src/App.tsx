@@ -128,7 +128,7 @@ export default function App() {
             const t = await api.transcript(saved);
             setLines([
               { kind: "system", text: "— resumed your game —" },
-              ...t.transcript.map((text) => ({ kind: "game" as const, text })),
+              ...t.log.map((e) => ({ kind: e.kind, text: e.text })),
             ]);
           } catch { /* transcript is best-effort */ }
           await refreshPanels(saved);
@@ -255,7 +255,7 @@ export default function App() {
             <StatusBar state={state} onAction={send} />
             {showMap && (
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-cave-600 mb-1 px-1">Cave map</div>
+                <div className="text-[10px] uppercase tracking-wider text-cave-300 mb-1 px-1">Cave map</div>
                 <MapPanel code={mapCode} depth={mapDepth} onDepth={setMapDepth} />
               </div>
             )}

@@ -27,7 +27,8 @@ export const api = {
     jfetch<TurnResult>(`/games/${sid}/command`, { method: "POST", body: JSON.stringify({ command }) }),
   state: (sid: string) => jfetch<GameState>(`/games/${sid}/state`),
   transcript: (sid: string) =>
-    jfetch<{ session_id: string; transcript: string[] }>(`/games/${sid}/transcript`),
+    jfetch<{ session_id: string; log: { kind: "you" | "game"; text: string }[] }>(
+      `/games/${sid}/transcript`),
   scene: (sid: string, style?: string) =>
     jfetch<Scene>(`/games/${sid}/scene${style ? `?style=${encodeURIComponent(style)}` : ""}`),
   styles: () => jfetch<{ styles: string[]; default: string }>("/styles"),

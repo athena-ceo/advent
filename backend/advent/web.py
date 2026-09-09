@@ -127,8 +127,12 @@ def state(session_id: str):
 
 @app.get("/api/games/{session_id}/transcript")
 def transcript(session_id: str):
-    return {"session_id": session_id,
-            "transcript": [sc(t) for t in _session(session_id).transcript()]}
+    # Interleaved log (commands + replies) so a reload rebuilds the whole
+    # conversation. Game replies are sentence-cased; player commands shown as typed.
+    log = [{"kind": e["kind"],
+            "text": sc(e["text"]) if e["kind"] == "game" else e["text"]}
+           for e in _session(session_id).log()]
+    return {"session_id": session_id, "log": log}
 
 
 @app.post("/api/games/{session_id}/save")

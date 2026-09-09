@@ -17,7 +17,7 @@ function Pill({ label, onClick, title }: { label: string; onClick?: () => void; 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-cave-600 mb-1">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-cave-300 mb-1">{label}</div>
       <div className="flex flex-wrap gap-1">{children}</div>
     </div>
   );
@@ -34,7 +34,7 @@ export function StatusBar({ state, onAction }: { state?: GameState; onAction: (c
     <div className="rounded-lg border border-cave-600 bg-cave-800 p-3 space-y-3">
       <div className="flex items-center justify-between">
         <span className="font-serif text-amber-glow">{state.name}</span>
-        <span className="text-xs text-cave-600">room {state.location}</span>
+        <span className="text-xs text-cave-300">room {state.location}</span>
       </div>
       {state.description && (
         <p className="text-[13px] leading-relaxed whitespace-pre-wrap font-mono text-cave-200/90">
@@ -42,9 +42,9 @@ export function StatusBar({ state, onAction }: { state?: GameState; onAction: (c
         </p>
       )}
       <div className="flex gap-4 text-sm">
-        <div><span className="text-cave-600">score </span><b>{state.score}</b><span className="text-cave-600">/{state.max_score}</span></div>
-        <div><span className="text-cave-600">turns </span><b>{state.turns}</b></div>
-        <div><span className="text-cave-600">lamp </span><b className={state.lamp_on ? "text-amber-glow" : ""}>{state.lamp_on ? "on" : "off"}</b></div>
+        <div><span className="text-cave-300">score </span><b>{state.score}</b><span className="text-cave-300">/{state.max_score}</span></div>
+        <div><span className="text-cave-300">turns </span><b>{state.turns}</b></div>
+        <div><span className="text-cave-300">lamp </span><b className={state.lamp_on ? "text-amber-glow" : ""}>{state.lamp_on ? "on" : "off"}</b></div>
       </div>
       {state.visible_objects.length > 0 && (
         <Row label="You see (take)">{state.visible_objects.map((o) => objPill(o, "take"))}</Row>

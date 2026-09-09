@@ -12,6 +12,7 @@ prompt, and the placement layout.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from .data import GameData
@@ -24,6 +25,9 @@ _MEDIUM = {
     "anime": "anime, cel shaded",
     "cartoon": "stylized 3d cartoon, Pixar style",
     "watercolor": "watercolor and ink",
+    "oil": "classical oil painting, thick impasto brushwork",
+    "woodcut": "antique woodcut engraving, sepia ink, cross-hatching",
+    "comic": "graphic novel comic art, bold black ink, cel shading",
 }
 
 # Creatures get drawn large and central; everything else is a smaller "item".
@@ -82,9 +86,29 @@ def has_sprite(data: GameData, obj: int) -> bool:
     return obj in _reverse(data)
 
 
+# The engine's object labels carry cruft ("(bear uses rtext 141)", ">grunt!<",
+# quotes) that must not reach the image prompt. Strip it, and give a few cryptic
+# ones a clean, evocative name.
+_CRUFT = re.compile(r">[^<]*<|\([^)]*\)|rtext\s*\d+|[\">$]", re.I)
+_NICE_NAME = {
+    "BEAR": "a large brown bear",
+    "MAGAZ": "a rolled-up magazine",
+    "CLAM": "a giant clam shell",
+    "OYSTE": "a giant oyster shell",
+}
+
+
+def _clean_name(data: GameData, obj: int) -> str:
+    word = _reverse(data).get(obj)
+    if word in _NICE_NAME:
+        return _NICE_NAME[word]
+    name = " ".join(_CRUFT.sub(" ", data.object_name(obj)).split()).strip().lower()
+    return name or (word or "object").lower()
+
+
 def sprite_prompt(data: GameData, obj: int, style: str = DEFAULT_STYLE) -> str:
     """Prompt for generating one object's sprite, in the given style."""
-    name = data.object_name(obj).lower()
+    name = _clean_name(data, obj)
     kind = "a fearsome creature," if is_creature(data, obj) else "a single game object,"
     medium = _MEDIUM.get(style, _MEDIUM[DEFAULT_STYLE])
     return f"{name}, {kind} {medium}, {SPRITE_STYLE}"
