@@ -23,3 +23,8 @@ scene-cache/
 .venv*/
 *~
 .env~
+
+# SQLite user/game DB (local runs)
+advent.db
+advent.db-*
+*.sqlite*

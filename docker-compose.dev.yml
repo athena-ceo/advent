@@ -19,13 +19,16 @@ services:
       ADVENT_SCENE_CACHE: /data/scene-cache
       ADVENT_SPRITE_CACHE: /data/sprite-cache
       ADVENT_COMPOSITE_CACHE: /data/composite-cache
+      ADVENT_DB: /data/db/advent.db
+      ADVENT_ADMIN_PASSWORD: ${ADVENT_ADMIN_PASSWORD:-}
     volumes:
       # Live-edit backend code, and persist the image caches (scene plates,
-      # object sprites, and the composited results).
+      # object sprites, composited results) and the players/games database.
       - ./backend:/app
       - ${ADVENT_SCENE_CACHE_HOST:-./scene-cache}:/data/scene-cache
       - ${ADVENT_SPRITE_CACHE_HOST:-./sprite-cache}:/data/sprite-cache
       - ${ADVENT_COMPOSITE_CACHE_HOST:-./composite-cache}:/data/composite-cache
+      - advent-db:/data/db
     command: ["uvicorn", "advent.web:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     networks:
       - advent-network
@@ -44,6 +47,9 @@ services:
       - backend
     networks:
       - advent-network
+
+volumes:
+  advent-db:
 
 networks:
   advent-network:

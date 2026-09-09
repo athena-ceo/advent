@@ -30,6 +30,7 @@ class Session:
                  resume_state: dict | None = None):
         self.id = session_id or uuid.uuid4().hex[:12]
         self.seed = seed
+        self.player_id: str | None = None   # set by the manager for tracking
         self.created_at = time.time()
         self.last_active = self.created_at
         self.ended = False
@@ -133,8 +134,9 @@ class Session:
 class SessionManager:
     """In-memory registry of sessions with simple FIFO eviction."""
 
-    def __init__(self, max_sessions: int = 200):
+    def __init__(self, max_sessions: int = 200, store=None):
         self.max_sessions = max_sessions
+        self.store = store            # optional advent.store.Store for durability
         self._sessions: dict[str, Session] = {}
         self._saves: dict[str, dict] = {}
         self._lock = threading.Lock()
@@ -144,10 +146,41 @@ class SessionManager:
         if len(self._sessions) > self.max_sessions:
             oldest = min(self._sessions.values(), key=lambda s: s.last_active)
             self._sessions.pop(oldest.id, None)
-            oldest.close()
+            oldest.close()   # evicted from memory only; its snapshot lives in the store
 
-    def create(self, seed: int | None = None) -> Session:
+    def persist(self, session: Session) -> None:
+        """Snapshot a session's current game to the store (safe no-op without one)."""
+        if self.store is None or not session.player_id:
+            return
+        st = session.state()
+        self.store.save_game(
+            session.id, session.player_id, session.seed, session.game.save_state(),
+            score=st["score"], max_score=st["max_score"], turns=st["turns"],
+            location=st["location"], ended=st["ended"])
+
+    def create(self, seed: int | None = None, player_id: str | None = None) -> Session:
         session = Session(seed=seed)
+        session.player_id = player_id
+        with self._lock:
+            self._register(session)
+        self.persist(session)
+        return session
+
+    def reattach(self, session_id: str, player_id: str | None = None) -> Session | None:
+        """Return a live session, rehydrating from the store if it's not in memory
+        (evicted past the cap, or lost to a restart). None if truly unknown."""
+        session = self.get(session_id)
+        if session is not None:
+            if player_id:
+                session.player_id = player_id
+            return session
+        if self.store is None:
+            return None
+        blob = self.store.load_state(session_id)
+        if blob is None:
+            return None
+        session = Session(session_id=session_id, resume_state=blob)
+        session.player_id = player_id or self.store.game_player(session_id)
         with self._lock:
             self._register(session)
         return session
@@ -162,15 +195,17 @@ class SessionManager:
             self._saves[save_id] = session.game.save_state()
         return save_id
 
-    def restore(self, save_id: str) -> Session | None:
+    def restore(self, save_id: str, player_id: str | None = None) -> Session | None:
         """Start a new session from a saved snapshot; None if the id is unknown."""
         with self._lock:
             blob = self._saves.get(save_id)
         if blob is None:
             return None
         session = Session(resume_state=blob)
+        session.player_id = player_id
         with self._lock:
             self._register(session)
+        self.persist(session)
         return session
 
     def get(self, session_id: str) -> Session | None:

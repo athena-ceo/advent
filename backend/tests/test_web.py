@@ -21,6 +21,32 @@ def test_health(client):
     assert client.get("/health").json()["status"] == "ok"
 
 
+def test_register_play_claim_and_leaderboard(client):
+    guest = "guesttest01"
+    hp = {"X-Advent-Player": guest}
+    # play a couple of turns as a guest, then register (claims the guest's game)
+    sid = client.post("/api/games", json={}, headers=hp).json()["session_id"]
+    for c in ["no", "enter"]:
+        client.post(f"/api/games/{sid}/command", json={"command": c}, headers=hp)
+    reg = client.post("/api/auth/register",
+                      json={"name": "Tester", "password": "pass"}, headers=hp).json()
+    assert reg["user"]["name"] == "Tester" and reg["token"]
+
+    board = client.get("/api/leaderboard").json()["entries"]
+    assert any(e["name"] == "Tester" for e in board)
+    m = client.get("/api/metrics").json()
+    assert m["registered_total"] >= 1 and m["games_total"] >= 1
+
+    # admin is gated
+    assert client.get("/api/admin/users").status_code in (403, 503)
+
+
+def test_login_rejects_bad_password(client):
+    client.post("/api/auth/register", json={"name": "Zork", "password": "grue"})
+    assert client.post("/api/auth/login",
+                       json={"name": "Zork", "password": "wrong"}).status_code == 401
+
+
 def test_direct_play_flow(client):
     sid = client.post("/api/games", json={"seed": 1}).json()["session_id"]
     for cmd in ["no", "enter", "take lamp"]:

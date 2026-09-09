@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Athena Decisions Systems SAS.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "./api";
+import { api, setAuthToken, type User } from "./api";
 import type { GameState, Scene } from "./types";
 import { ScenePanel } from "./components/ScenePanel";
 import { MapPanel } from "./components/MapPanel";
@@ -8,6 +8,9 @@ import { StatusBar } from "./components/StatusBar";
 import { Transcript, type Line } from "./components/Transcript";
 import { CommandBar } from "./components/CommandBar";
 import { InfoModal, type InfoKind } from "./components/InfoModal";
+import { AuthModal } from "./components/AuthModal";
+import { LeaderboardModal } from "./components/LeaderboardModal";
+import { AdminModal } from "./components/AdminModal";
 
 type Mode = "classic" | "guided";
 
@@ -38,7 +41,20 @@ export default function App() {
   const [styles, setStyles] = useState<string[]>([]);
   const [style, setStyle] = useState<string>(() => localStorage.getItem(STYLE_KEY) ?? "");
   const [info, setInfo] = useState<InfoKind | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [boardOpen, setBoardOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
+
+  // Who am I? (registered account via token, else a guest row)
+  useEffect(() => { api.me().then((r) => setUser(r.user)).catch(() => {}); }, []);
+
+  const logout = async () => {
+    try { await api.logout(); } catch { /* ignore */ }
+    setAuthToken(null);
+    setUser(null);
+  };
 
   useEffect(() => { localStorage.setItem(LEFT_KEY, String(leftFrac)); }, [leftFrac]);
   useEffect(() => { localStorage.setItem(MAP_KEY, showMap ? "1" : "0"); }, [showMap]);
@@ -208,6 +224,8 @@ export default function App() {
             className="text-xs px-2 py-0.5 rounded border border-cave-600 bg-cave-700 hover:border-amber-glow/60">Help</button>
           <button onClick={() => setInfo("about")}
             className="text-xs px-2 py-0.5 rounded border border-cave-600 bg-cave-700 hover:border-amber-glow/60">About</button>
+          <button onClick={() => setBoardOpen(true)}
+            className="text-xs px-2 py-0.5 rounded border border-cave-600 bg-cave-700 hover:border-amber-glow/60">Scores</button>
         </div>
         <div className="flex items-center gap-2 text-sm">
           <div className="flex rounded overflow-hidden border border-cave-600">
@@ -234,6 +252,15 @@ export default function App() {
           <button onClick={save} disabled={!sid || busy} className={btn}>Save</button>
           <button onClick={restore} disabled={!saveId || busy} className={btn}>Restore</button>
           <button onClick={newGame} disabled={busy} className={btn}>New</button>
+          <span className="w-px h-5 bg-cave-600 mx-1" />
+          {user?.registered ? (
+            <div className="flex items-center gap-1">
+              <span className="text-amber-glow font-semibold px-1" title="signed in">{user.name}</span>
+              <button onClick={logout} className={btn}>Sign out</button>
+            </div>
+          ) : (
+            <button onClick={() => setAuthOpen(true)} className={btn}>Sign in</button>
+          )}
         </div>
       </header>
 
@@ -271,6 +298,12 @@ export default function App() {
       </main>
 
       {info && <InfoModal kind={info} onClose={() => setInfo(null)} />}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} onAuth={setUser} />}
+      {boardOpen && (
+        <LeaderboardModal onClose={() => setBoardOpen(false)}
+          onAdmin={() => { setBoardOpen(false); setAdminOpen(true); }} />
+      )}
+      {adminOpen && <AdminModal onClose={() => setAdminOpen(false)} />}
     </div>
   );
 }

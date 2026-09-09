@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -20,10 +20,12 @@ from .compositor import SceneComposer
 from .data import load_default_data
 from .scene import STYLES, resolve_style, SceneStore
 from .session import SessionManager
+from .store import Store
 from .text import sentence_case as sc
 
 GAME_DATA = load_default_data()
-sessions = SessionManager()
+store = Store()  # ADVENT_DB env; defaults to in-memory (durable in dev/prod compose)
+sessions = SessionManager(store=store)
 chat_histories: dict[str, list] = {}
 
 _SPRITE_DIR = os.environ.get("ADVENT_SPRITE_CACHE", "./sprite-cache")
@@ -90,8 +92,42 @@ class ChatMessage(BaseModel):
     message: str
 
 
-def _session(session_id: str):
-    session = sessions.get(session_id)
+class Credentials(BaseModel):
+    name: str
+    password: str
+
+
+class DeleteUser(BaseModel):
+    player_id: str
+
+
+import uuid as _uuid
+
+
+def _pid(token: str | None, guest: str | None) -> str:
+    """Resolve the acting player: a logged-in account (token) wins, else the
+    browser's guest id, else a fresh guest. Always a tracked player row."""
+    if token:
+        user = store.user_for_token(token)
+        if user:
+            store.touch_player(user["id"])
+            return user["id"]
+    gid = guest or _uuid.uuid4().hex[:12]
+    store.touch_player(gid)
+    return gid
+
+
+def _admin(x_admin: str | None):
+    secret = os.environ.get("ADVENT_ADMIN_PASSWORD")
+    if not secret:
+        raise HTTPException(status_code=503, detail="admin is not configured on this server")
+    if x_admin != secret:
+        raise HTTPException(status_code=403, detail="bad admin password")
+
+
+def _session(session_id: str, player_id: str | None = None):
+    # Rehydrate from the store if the game isn't in memory (evicted or restarted).
+    session = sessions.reattach(session_id, player_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"no such session: {session_id}")
     return session
@@ -103,15 +139,23 @@ def health():
 
 
 @app.post("/api/games")
-def new_game(body: NewGame):
-    session = sessions.create(seed=body.seed)
+def new_game(body: NewGame,
+             x_advent_token: str | None = Header(None),
+             x_advent_player: str | None = Header(None)):
+    pid = _pid(x_advent_token, x_advent_player)
+    session = sessions.create(seed=body.seed, player_id=pid)
     return {"session_id": session.id, "intro": sc(session.intro),
-            "state": _pretty_state(session.state())}
+            "state": _pretty_state(session.state()), "player": store.player(pid)}
 
 
 @app.post("/api/games/{session_id}/command")
-def command(session_id: str, body: Command):
-    return _pretty_turn(_session(session_id).command(body.command))
+def command(session_id: str, body: Command,
+            x_advent_token: str | None = Header(None),
+            x_advent_player: str | None = Header(None)):
+    session = _session(session_id, _pid(x_advent_token, x_advent_player))
+    r = session.command(body.command)
+    sessions.persist(session)
+    return _pretty_turn(r)
 
 
 @app.get("/api/games/{session_id}/state")
@@ -136,12 +180,86 @@ def save_game(session_id: str):
 
 
 @app.post("/api/restore")
-def restore_game(body: Restore):
-    session = sessions.restore(body.save_id)
+def restore_game(body: Restore,
+                 x_advent_token: str | None = Header(None),
+                 x_advent_player: str | None = Header(None)):
+    session = sessions.restore(body.save_id, player_id=_pid(x_advent_token, x_advent_player))
     if session is None:
         raise HTTPException(status_code=404, detail=f"no such save: {body.save_id}")
     return {"session_id": session.id, "output": sc(session.intro),
             "state": _pretty_state(session.state())}
+
+
+# -- accounts (name + password; guests are claimed on register/login) --------
+
+@app.post("/api/auth/register")
+def auth_register(body: Credentials, x_advent_player: str | None = Header(None)):
+    from .store import AuthError
+    try:
+        user, token = store.register(body.name, body.password, guest_id=x_advent_player)
+    except AuthError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"user": user, "token": token}
+
+
+@app.post("/api/auth/login")
+def auth_login(body: Credentials, x_advent_player: str | None = Header(None)):
+    from .store import AuthError
+    try:
+        user, token = store.login(body.name, body.password, guest_id=x_advent_player)
+    except AuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    return {"user": user, "token": token}
+
+
+@app.post("/api/auth/logout")
+def auth_logout(x_advent_token: str | None = Header(None)):
+    store.logout(x_advent_token)
+    return {"ok": True}
+
+
+@app.get("/api/auth/me")
+def auth_me(x_advent_token: str | None = Header(None),
+            x_advent_player: str | None = Header(None)):
+    user = store.user_for_token(x_advent_token) if x_advent_token else None
+    return {"user": user or (store.player(x_advent_player) if x_advent_player else None)}
+
+
+@app.get("/api/leaderboard")
+def leaderboard(limit: int = 20):
+    return {"entries": store.leaderboard(min(max(limit, 1), 100))}
+
+
+@app.get("/api/metrics")
+def metrics():
+    return store.metrics()
+
+
+# -- admin (gated by the ADVENT_ADMIN_PASSWORD env, sent as X-Advent-Admin) ---
+
+@app.get("/api/admin/users")
+def admin_users(x_advent_admin: str | None = Header(None)):
+    _admin(x_advent_admin)
+    return {"users": store.list_users()}
+
+
+@app.get("/api/admin/games")
+def admin_games(x_advent_admin: str | None = Header(None)):
+    _admin(x_advent_admin)
+    return {"games": store.recent_games()}
+
+
+@app.post("/api/admin/reset-leaderboard")
+def admin_reset(x_advent_admin: str | None = Header(None)):
+    _admin(x_advent_admin)
+    return {"removed": store.reset_leaderboard()}
+
+
+@app.post("/api/admin/delete-user")
+def admin_delete_user(body: DeleteUser, x_advent_admin: str | None = Header(None)):
+    _admin(x_advent_admin)
+    store.delete_user(body.player_id)
+    return {"ok": True}
 
 
 @app.get("/api/styles")
@@ -190,6 +308,7 @@ def chat(session_id: str, body: ChatMessage):
     reply, history = run_chat(session, history, body.message,
                               scenes=get_composer(None).scenes, data=GAME_DATA)
     chat_histories[session_id] = history
+    sessions.persist(session)
     # The LLM reply is already normal prose; only prettify the engine state.
     return {"reply": reply, "state": _pretty_state(session.state())}
 
