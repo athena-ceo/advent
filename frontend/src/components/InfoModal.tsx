@@ -126,7 +126,7 @@ function About() {
         <H>A personal note</H>
         <p>I started programming in high school around <b>1979</b>, after getting
           access to the University of Toledo’s computers in Toledo, Ohio. One of
-          the first things I stumbled onto was a PDP-11 FORTRAN version of{" "}
+          the first things I stumbled onto was a PDP-11/70 FORTRAN version of{" "}
           <i>Adventure</i> — my very first computer game. I got hold of the source,
           taught myself FORTRAN to read it, and spent weeks poring over the data
           file, converting it by hand into a drawn map of Colossal Cave. It was my
