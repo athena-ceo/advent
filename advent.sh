@@ -54,10 +54,14 @@ case "$CMD" in
     # lazily from the scene + sprite plates.
     : "${ADVENT_DEPLOY_SSH:?set ADVENT_DEPLOY_SSH=user@host in .env}"
     : "${ADVENT_DEPLOY_DIR:?set ADVENT_DEPLOY_DIR=/path/to/advent on the server in .env}"
+    # Runs from THIS (dev) machine and pushes up to the server over SSH -- the
+    # server never connects back. Create the target dirs in case the app repo
+    # isn't checked out on the server yet (staging the banks ahead of deploy).
+    ssh "${ADVENT_DEPLOY_SSH}" "mkdir -p '${ADVENT_DEPLOY_DIR}/scene-cache' '${ADVENT_DEPLOY_DIR}/sprite-cache'"
     for dir in scene-cache sprite-cache; do
       if [ -d "$dir" ]; then
         echo "==> rsync $dir -> ${ADVENT_DEPLOY_SSH}:${ADVENT_DEPLOY_DIR}/$dir"
-        rsync -az --info=progress2 --delete "$dir/" \
+        rsync -a --info=progress2 --delete "$dir/" \
           "${ADVENT_DEPLOY_SSH}:${ADVENT_DEPLOY_DIR}/$dir/"
       fi
     done
